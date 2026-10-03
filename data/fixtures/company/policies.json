@@ -1,0 +1,39 @@
+[
+  {
+    "policy_id": "policy-default",
+    "ambiguous_route_role": "area_manager",
+    "no_asset_route_role": "area_manager",
+    "rules": [
+      {
+        "rule_id": "critical-emission",
+        "conditions": {
+          "emission_auto_gte": "EMISSION_CRITICAL_KGH",
+          "match_result_in": ["MATCHED", "AMBIGUOUS"]
+        },
+        "priority": "CRITICAL",
+        "notify_role": "site_manager"
+      },
+      {
+        "rule_id": "high-emission",
+        "conditions": {
+          "emission_auto_gte": "EMISSION_HIGH_KGH"
+        },
+        "priority": "HIGH",
+        "notify_role": "site_manager"
+      },
+      {
+        "rule_id": "recurrence",
+        "conditions": {
+          "detection_count_gte": "RECURRENCE_MIN_DETECTIONS"
+        },
+        "priority": "HIGH",
+        "notify_role": "site_manager"
+      }
+    ],
+    "thresholds": {
+      "EMISSION_CRITICAL_KGH": 500,
+      "EMISSION_HIGH_KGH": 150,
+      "RECURRENCE_MIN_DETECTIONS": 3
+    }
+  }
+]

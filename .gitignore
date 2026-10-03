@@ -1,0 +1,10 @@
+.env
+.env.local
+**/.env
+!**/.env.example
+.venv/
+__pycache__/
+node_modules/
+dist/
+*.png
+!data/fixtures/**/*.png

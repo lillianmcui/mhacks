@@ -1,0 +1,16 @@
+[
+  {
+    "contact_id": "contact-ops-lead",
+    "name": "Ops Lead (teammate)",
+    "role": "site_manager",
+    "phone": "+1REPLACE_ME",
+    "area_id": "permian-north"
+  },
+  {
+    "contact_id": "contact-area-mgr",
+    "name": "Area Manager (teammate)",
+    "role": "area_manager",
+    "phone": "+1REPLACE_ME",
+    "area_id": "permian-north"
+  }
+]
