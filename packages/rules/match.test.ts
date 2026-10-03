@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { haversineM, matchAsset, type AssetPoint } from "./match.js";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { haversineM, matchAsset, type AssetPoint } from "./match.ts";
 
 const PLUME = { latitude: 31.85, longitude: -103.45 };
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 function asset(id: string, latOffsetM: number, lonOffsetM = 0): AssetPoint {
   const mPerDegLat = 111_320;
@@ -13,48 +18,54 @@ function asset(id: string, latOffsetM: number, lonOffsetM = 0): AssetPoint {
   };
 }
 
-describe("matchAsset", () => {
-  it("MATCHED when exactly one asset within R", () => {
-    const out = matchAsset(PLUME, [asset("TX-184", 100)], 250);
-    expect(out.match_result).toBe("MATCHED");
-    expect(out.asset_id).toBe("TX-184");
-    expect(out.distance_m).toBeGreaterThan(90);
-    expect(out.distance_m).toBeLessThan(110);
-    expect(out.candidates).toHaveLength(1);
-  });
+test("MATCHED when exactly one asset within R", () => {
+  const out = matchAsset(PLUME, [asset("TX-184", 100)], 250);
+  assert.equal(out.match_result, "MATCHED");
+  assert.equal(out.asset_id, "TX-184");
+  assert.ok((out.distance_m ?? 0) > 90);
+  assert.ok((out.distance_m ?? 0) < 110);
+  assert.equal(out.candidates.length, 1);
+});
 
-  it("AMBIGUOUS when more than one asset within R", () => {
-    const out = matchAsset(
-      PLUME,
-      [asset("TX-184", 50), asset("TX-185", 120)],
-      250,
-    );
-    expect(out.match_result).toBe("AMBIGUOUS");
-    expect(out.asset_id).toBeUndefined();
-    expect(out.candidates.map((c) => c.asset_id)).toEqual(["TX-184", "TX-185"]);
-    expect(out.candidates[0].distance_m).toBeLessThan(out.candidates[1].distance_m);
-  });
+test("AMBIGUOUS when more than one asset within R", () => {
+  const out = matchAsset(PLUME, [asset("TX-184", 50), asset("TX-185", 120)], 250);
+  assert.equal(out.match_result, "AMBIGUOUS");
+  assert.equal(out.asset_id, undefined);
+  assert.deepEqual(
+    out.candidates.map((c) => c.asset_id),
+    ["TX-184", "TX-185"],
+  );
+  assert.ok(out.candidates[0].distance_m < out.candidates[1].distance_m);
+});
 
-  it("NO_REGISTERED_ASSET when none within R", () => {
-    const out = matchAsset(PLUME, [asset("TX-999", 400)], 250);
-    expect(out.match_result).toBe("NO_REGISTERED_ASSET");
-    expect(out.candidates).toEqual([]);
-  });
+test("NO_REGISTERED_ASSET when none within R", () => {
+  const out = matchAsset(PLUME, [asset("TX-999", 400)], 250);
+  assert.equal(out.match_result, "NO_REGISTERED_ASSET");
+  assert.deepEqual(out.candidates, []);
+});
 
-  it("includes asset at exactly R (boundary)", () => {
-    const r = 250;
-    const d = haversineM(PLUME.latitude, PLUME.longitude, PLUME.latitude, PLUME.longitude);
-    expect(d).toBe(0);
-    const onBoundary = asset("TX-BND", r);
-    const dist = haversineM(
-      PLUME.latitude,
-      PLUME.longitude,
-      onBoundary.latitude,
-      onBoundary.longitude,
-    );
-    expect(dist).toBeLessThanOrEqual(r + 0.5);
-    const out = matchAsset(PLUME, [onBoundary], r);
-    expect(out.match_result).toBe("MATCHED");
-    expect(out.asset_id).toBe("TX-BND");
-  });
+test("includes asset at exactly R (boundary)", () => {
+  const r = 250;
+  const onBoundary = asset("TX-BND", r);
+  const dist = haversineM(
+    PLUME.latitude,
+    PLUME.longitude,
+    onBoundary.latitude,
+    onBoundary.longitude,
+  );
+  assert.ok(dist <= r + 0.5);
+  const out = matchAsset(PLUME, [onBoundary], r);
+  assert.equal(out.match_result, "MATCHED");
+  assert.equal(out.asset_id, "TX-BND");
+});
+
+test("MATCHED against company fixture when plume is at asset coords", () => {
+  const raw = JSON.parse(
+    readFileSync(join(HERE, "../../data/fixtures/company/assets.json"), "utf8"),
+  ) as AssetPoint[];
+  const plume = { latitude: raw[0].latitude, longitude: raw[0].longitude };
+  const out = matchAsset(plume, raw, 250);
+  assert.equal(out.match_result, "MATCHED");
+  assert.equal(out.asset_id, "TX-184");
+  assert.equal(out.distance_m, 0);
 });

@@ -1,0 +1,3 @@
+# Optional: Agentverse / ASI:One agent process
+-r requirements.txt
+uagents>=0.19.0

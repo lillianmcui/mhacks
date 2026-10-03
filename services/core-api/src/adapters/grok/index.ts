@@ -41,7 +41,7 @@ export async function grokBriefing(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.GROK_MODEL ?? "grok-2-latest",
+        model: process.env.GROK_MODEL ?? "grok-3",
         temperature: 0.2,
         messages: [
           { role: "system", content: system },
@@ -67,7 +67,10 @@ export async function grokBriefing(
     assertNumbersGroundedInInput(text, { kind, briefing: input });
     return { text };
   } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
+    const aborted =
+      controller.signal.aborted ||
+      (err instanceof Error && err.name === "AbortError");
+    if (aborted) {
       throw new Error(`Grok request timed out after ${timeoutMs}ms`);
     }
     throw err;

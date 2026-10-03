@@ -47,7 +47,10 @@ export function renderTemplateBriefing(
       input.display.priority ? `Priority: ${input.display.priority}.` : "",
       input.display.policy_action ?? "",
     ].filter(Boolean);
-    return parts.join(" ").slice(0, 320) + caveats;
+    // Prefer keeping caveat text intact; trim the main body if needed.
+    const body = parts.join(" ");
+    const maxBody = Math.max(0, 320 - caveats.length);
+    return body.slice(0, maxBody) + caveats;
   }
 
   if (kind === "summary") {

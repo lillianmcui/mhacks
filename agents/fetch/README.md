@@ -2,26 +2,32 @@
 
 Autonomous orchestration for methane incident response. **No business logic** — only Core API actions.
 
-## CP0 decision (first hour)
-
-Can a hosted Agentverse agent reach your Core API?
-
-1. Run Core API locally (backend) on port `8787`.
-2. Expose with a tunnel, e.g. `ngrok http 8787`, and set `CORE_API_BASE` to the public URL.
-3. Set the same bearer token as the API in `CORE_API_BEARER`.
-
-If Agentverse cannot call arbitrary HTTPS URLs, run this agent **locally** with `mailbox=True` and ASI:One (P1).
-
-## Setup
+## Local work (no backend yet)
 
 ```bash
 cd agents/fetch
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-# edit .env
-python agent.py
+cp .env.example .env   # CORE_API_BEARER=dev-bearer
+
+# terminal 1
+python mock_server.py
+
+# terminal 2
+python test_orchestrate.py
+python cli.py "Do we have any unresolved methane incidents?"
+python cli.py "Handle the highest priority one"
 ```
+
+For Agentverse (`agent.py`): `pip install -r requirements-agent.txt`.
+
+`mock_server.py` is a **Track C stub** with synthetic canned data. Replace `CORE_API_BASE` with the real backend stub when it lands.
+
+## Agentverse
+
+1. Backend Core API on a public tunnel, or run this agent locally with mailbox.
+2. `python agent.py` after `.env` is set.
+3. Tell backend which option you chose.
 
 ## Demo phrases
 

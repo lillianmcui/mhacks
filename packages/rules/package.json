@@ -1,13 +1,19 @@
 {
   "name": "@ch4se/rules",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Deterministic CH4SE rules. priority.ts: backend. match.ts: Track C.",
+  "exports": {
+    "./priority.ts": "./priority.ts",
+    "./match.ts": "./match.ts"
+  },
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "node --experimental-strip-types --test match.test.ts",
+    "typecheck": "tsc -p ."
   },
   "devDependencies": {
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.4"
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.0"
   }
 }
