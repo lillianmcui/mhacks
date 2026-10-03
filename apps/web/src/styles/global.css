@@ -136,14 +136,18 @@ button { font: inherit; }
 @keyframes blink { 50% { opacity: 0.3; } }
 
 /* ---- Map markers -------------------------------------------------------- */
-.asset-marker { display: flex; align-items: center; gap: 0.3rem; cursor: default; }
-.asset-marker__dot { width: 12px; height: 12px; border-radius: 3px; background: #6b7a8c; border: 2px solid #0b0f14; }
-.asset-marker__label { font-size: 0.7rem; font-weight: 700; color: #c5d0dc; text-shadow: 0 0 3px #000, 0 0 3px #000; }
+/* Marker roots are positioned by MapLibre (.maplibregl-marker); don't set `position` on them. */
+.asset-marker { cursor: default; }
+.asset-marker__dot { display: block; width: 12px; height: 12px; border-radius: 3px; background: #6b7a8c; border: 2px solid #0b0f14; }
+.asset-marker__label {
+  position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 0.3rem; white-space: nowrap;
+  font-size: 0.7rem; font-weight: 700; color: #c5d0dc; text-shadow: 0 0 3px #000, 0 0 3px #000;
+}
 .asset-marker--candidate .asset-marker__dot { background: var(--amber); }
 .asset-marker--highlight .asset-marker__dot { width: 16px; height: 16px; background: var(--amber); box-shadow: 0 0 0 4px rgba(255, 176, 32, 0.35); }
 .asset-marker--highlight .asset-marker__label { color: #fff; font-size: 0.85rem; }
 
-.plume-marker { position: relative; width: 18px; height: 18px; }
+.plume-marker { width: 18px; height: 18px; }
 .plume-marker__core { position: absolute; inset: 3px; border-radius: 50%; background: var(--plume); border: 2px solid #fff; }
 .plume-marker__pulse { position: absolute; inset: 0; border-radius: 50%; background: var(--plume); opacity: 0; }
 .plume-marker--focus .plume-marker__pulse { animation: pulse 1.8s ease-out infinite; }

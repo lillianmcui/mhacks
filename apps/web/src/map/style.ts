@@ -7,23 +7,25 @@ const OFFLINE_STYLE: StyleSpecification = {
   layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0d1117' } }],
 };
 
-const RASTER_STYLE: StyleSpecification = {
+// Keyless satellite imagery: well pads and pipelines are visible, which suits the demo.
+const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     basemap: {
       type: 'raster',
-      tiles: ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png`),
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
-      attribution: '© OpenStreetMap contributors © CARTO',
+      maxzoom: 18,
+      attribution: 'Imagery © Esri, Maxar, Earthstar Geographics',
     },
   },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#0d1117' } },
-    { id: 'basemap', type: 'raster', source: 'basemap' },
+    { id: 'basemap', type: 'raster', source: 'basemap', paint: { 'raster-brightness-max': 0.75, 'raster-saturation': -0.3 } },
   ],
 };
 
 export function mapStyle(): string | StyleSpecification {
   if (config.mapOffline) return OFFLINE_STYLE;
-  return config.mapStyleUrl || RASTER_STYLE;
+  return config.mapStyleUrl || SATELLITE_STYLE;
 }

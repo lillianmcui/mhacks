@@ -15,7 +15,7 @@ interface Props {
   radiusM: number;
 }
 
-const FOCUS_ZOOM = 13;
+const FOCUS_ZOOM = 15;
 const FIT_PADDING = 40;
 
 /**
@@ -76,13 +76,10 @@ export function EventMap({ assets, events, focusEvent, highlightAssetId, candida
         assetMarkers.current.set(a.asset_id, m);
       }
       const el = m.getElement();
-      el.className = [
-        'asset-marker',
-        a.asset_id === highlightAssetId && 'asset-marker--highlight',
-        candidateAssetIds.includes(a.asset_id) && 'asset-marker--candidate',
-      ]
-        .filter(Boolean)
-        .join(' ');
+      // Toggle classes only: MapLibre positions markers via its own classes on this element.
+      el.classList.add('asset-marker');
+      el.classList.toggle('asset-marker--highlight', a.asset_id === highlightAssetId);
+      el.classList.toggle('asset-marker--candidate', candidateAssetIds.includes(a.asset_id));
       el.querySelector('.asset-marker__label')!.textContent = a.asset_id;
       el.title = `${a.asset_id} · ${a.facility_type}`;
       m.setLngLat([a.longitude, a.latitude]);
@@ -110,7 +107,8 @@ export function EventMap({ assets, events, focusEvent, highlightAssetId, candida
         plumeMarkers.current.set(e.event_id, m);
       }
       const el = m.getElement();
-      el.className = `plume-marker${e.event_id === focusEvent?.event_id ? ' plume-marker--focus' : ''}`;
+      el.classList.add('plume-marker');
+      el.classList.toggle('plume-marker--focus', e.event_id === focusEvent?.event_id);
       el.title = e.plume_id;
     }
     for (const [id, m] of plumeMarkers.current) {
