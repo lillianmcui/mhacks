@@ -1,0 +1,20 @@
+{
+  "name": "@ch4se/stdb-module",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CH4SE SpacetimeDB module: tables + reducers (TRACK_BACKEND.md §3.2-§3.4).",
+  "scripts": {
+    "build": "spacetime build",
+    "typecheck": "tsc -p .",
+    "publish:local": "spacetime publish ch4se --server local --yes",
+    "publish:local:clean": "spacetime publish ch4se --server local --delete-data=always --yes",
+    "generate": "spacetime generate --lang typescript --out-dir ../../packages/stdb-bindings/src/generated --module-path . --yes"
+  },
+  "dependencies": {
+    "spacetimedb": "2.10.2"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2"
+  }
+}

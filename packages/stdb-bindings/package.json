@@ -1,0 +1,20 @@
+{
+  "name": "@ch4se/stdb-bindings",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generated SpacetimeDB client bindings for the CH4SE module, plus a small connect helper.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@ch4se/contracts": "file:../contracts",
+    "spacetimedb": "2.10.2"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0"
+  }
+}
