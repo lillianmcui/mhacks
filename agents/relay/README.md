@@ -1,12 +1,17 @@
 # Relay agent (CH4SE)
 
-## Do we need Grok for inbound?
+## Free-form inbound (Grok + grounding)
 
-**No for P0.** Inbound replies are deterministic:
+Default path:
 
-operator text → intent → Core API action(s) → quote `display.*` strings → Relay reply
+```
+operator text → load Core API context pack → Grok answer → number-check → Relay reply
+```
 
-Grok stays on **outbound** `generate_briefing` (with template fallback). Optional freer inbound wording is P1 and must still pass the number-check if used.
+- Grok may only use the context pack (incident, evidence, history, policy, asset, demo playbook).
+- Any number not present in that JSON fails the check → deterministic fallback.
+- **Acknowledge** still calls `acknowledge_incident` in Core API first (not LLM-only).
+- Disable with `GROK_INBOUND=false` in root `.env`.
 
 ## Run inbound (WebSocket — preferred)
 

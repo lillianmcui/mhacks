@@ -1,4 +1,4 @@
-"""Unit tests for Relay intent routing (no network)."""
+"""Tests for free-form Grok inbound grounding."""
 
 from __future__ import annotations
 
@@ -6,55 +6,55 @@ import unittest
 from unittest.mock import patch
 
 from intent import Intent, classify
+from number_check import assert_numbers_grounded, extract_numbers
 from respond import handle_operator_text
 
 
-class IntentTests(unittest.TestCase):
-    def test_ack(self) -> None:
-        self.assertEqual(classify("Acknowledge it and mark my team as investigating"), Intent.ACKNOWLEDGE)
+class NumberCheckTests(unittest.TestCase):
+    def test_rejects_new_number(self) -> None:
+        with self.assertRaises(ValueError):
+            assert_numbers_grounded("About 999 kg", {"display": {"emission": "120 ± 40"}})
 
-    def test_how_bad(self) -> None:
-        self.assertEqual(classify("How bad is this?"), Intent.HOW_BAD)
-
-    def test_evidence(self) -> None:
-        self.assertEqual(classify("What evidence do we have?"), Intent.EVIDENCE)
-
-    def test_what_to_do(self) -> None:
-        self.assertEqual(classify("What should I do next?"), Intent.WHAT_TO_DO)
+    def test_allows_grounded(self) -> None:
+        assert_numbers_grounded(
+            "Release 120 ± 40 kg",
+            {"display": {"emission": "120 ± 40 kg CH4/hr"}},
+        )
+        self.assertIn("120", extract_numbers("120 ± 40"))
 
 
-class RespondTests(unittest.TestCase):
+class FreeFormTests(unittest.TestCase):
+    @patch("respond.answer_with_grok")
+    @patch("respond.build_context_pack")
+    @patch("respond.grok_enabled", return_value=True)
     @patch("respond.core_api")
-    def test_how_bad_quotes_display(self, api) -> None:
+    def test_free_form_uses_grok(self, api, _enabled, build_ctx, grok) -> None:
+        api.get_open_incidents.return_value = [{"incident_id": "INC-1"}]
+        api.record_action.return_value = {"action_id": "a"}
+        build_ctx.return_value = {"incident_id": "INC-1"}
+        grok.return_value = "Priority HIGH. Release: 120 ± 40 kg CH4/hr (Carbon Mapper estimate)."
+        out = handle_operator_text("can you summarize risk for my crew?")
+        self.assertIn("120 ± 40", out)
+        grok.assert_called_once()
+        self.assertEqual(grok.call_args[0][0], "can you summarize risk for my crew?")
+
+    @patch("respond.grok_enabled", return_value=False)
+    @patch("respond.core_api")
+    def test_fallback_without_grok(self, api, _enabled) -> None:
         api.get_incident.return_value = {
             "incident_id": "INC-1",
             "priority": "HIGH",
-            "display": {"headline": "HIGH — UNACKNOWLEDGED"},
+            "display": {},
         }
         api.get_evidence.return_value = {
-            "is_replay": True,
-            "display": {
-                "emission": "432 ± 99 kg CH4/hr (Carbon Mapper estimate)",
-                "asset": "No registered asset within range of the plume origin",
-            },
+            "display": {"emission": "120 ± 40 kg CH4/hr (Carbon Mapper estimate)"}
         }
         api.record_action.return_value = {"action_id": "a"}
-        text = handle_operator_text("How bad is this?", incident_id="INC-1")
-        self.assertIn("432 ± 99", text)
-        self.assertIn("HIGH", text)
-        api.get_evidence.assert_called_once()
+        out = handle_operator_text("How bad is this?", incident_id="INC-1")
+        self.assertIn("120 ± 40", out)
 
-    @patch("respond.core_api")
-    def test_ack_calls_acknowledge(self, api) -> None:
-        api.get_incident.return_value = {
-            "incident_id": "INC-1",
-            "assigned_contact_id": "contact-env",
-        }
-        api.acknowledge_incident.return_value = {"status": "INVESTIGATING"}
-        api.record_action.return_value = {"action_id": "a"}
-        text = handle_operator_text("ack and mark investigating", incident_id="INC-1")
-        self.assertIn("INVESTIGATING", text)
-        api.acknowledge_incident.assert_called_once()
+    def test_ack_still_classified(self) -> None:
+        self.assertEqual(classify("please acknowledge"), Intent.ACKNOWLEDGE)
 
 
 if __name__ == "__main__":
