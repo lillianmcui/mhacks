@@ -65,41 +65,46 @@ function sample(overrides: Partial<BriefingInput> = {}): BriefingInput {
   return { ...base, ...overrides };
 }
 
-test("quotes display strings and associated asset wording", () => {
-  const text = renderTemplateBriefing(sample(), "operator");
-  assert.match(text, /replayed historical observation/);
-  assert.match(text, /Associated asset: TX-184/);
-  assert.ok(text.includes("120 ± 40 kg CH4/hr (Carbon Mapper estimate)"));
-  assert.equal(text.includes("caused by"), false);
-});
-
-test("sms includes priority and emission display", () => {
+test("sms is short, scannable, and includes Do now steps", () => {
   const text = renderTemplateBriefing(sample(), "sms");
-  assert.match(text, /CH4SE HIGH/);
-  assert.match(text, /120 ± 40/);
+  assert.match(text, /CH4SE HIGH alert/);
+  assert.match(text, /Release: 120 ± 40/);
+  assert.match(text, /Do now:/);
+  assert.match(text, /TX-184/);
+  assert.match(text, /Reply ACK/);
+  assert.ok(text.split("\n").length <= 16);
+  assert.equal(text.includes("IPCC"), false);
+  assert.equal(text.includes("Wind:"), false);
 });
 
-test("states uncertain match when not MATCHED", () => {
+test("sms NO_REGISTERED_ASSET steps stress uncertainty", () => {
   const text = renderTemplateBriefing(
     sample({
       incident: {
         incident_id: "inc-1",
         status: "ANALYZED",
         priority: "HIGH",
-        match_result: "AMBIGUOUS",
-        distance_m: 40,
-        candidates: [
-          { asset_id: "TX-184", distance_m: 40 },
-          { asset_id: "TX-185", distance_m: 90 },
-        ],
+        match_result: "NO_REGISTERED_ASSET",
+        distance_m: null,
+        candidates: [],
       },
+      asset: null,
       display: {
         ...sample().display,
-        asset: "Nearest registered asset: TX-184 compressor_station (40 m from plume origin)",
+        asset: "No registered asset within range of the plume origin",
+        distance: null,
       },
     }),
-    "summary",
+    "sms",
   );
-  assert.match(text, /asset match is uncertain/i);
-  assert.match(text, /Nearest registered asset/);
+  assert.match(text, /no registered asset/i);
+  assert.match(text, /widen the search/i);
+});
+
+test("operator quotes display strings", () => {
+  const text = renderTemplateBriefing(sample(), "operator");
+  assert.match(text, /replayed historical observation/);
+  assert.match(text, /Associated asset: TX-184/);
+  assert.ok(text.includes("120 ± 40 kg CH4/hr (Carbon Mapper estimate)"));
+  assert.equal(text.includes("caused by"), false);
 });

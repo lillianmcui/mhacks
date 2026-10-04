@@ -1,41 +1,61 @@
 # Relay agent (CH4SE)
 
-**Time-box:** 45–90 minutes to pass P0 criteria (§5.3 in TRACK_AGENTS_DATA.md). If not, stop and let the dashboard be the P0 operator surface.
+## Free-form inbound (Grok + grounding)
 
-## Env
+Default path:
 
-- Webhook process: `agents/relay/.env` — `CORE_API_BASE` + `CORE_API_TOKEN`.
-- Outbound Relay/Grok keys: **repo-root** `.env` only (`RELAY_API_KEY`, `RELAY_API_BASE`, …). `services/core-api/.env` is not loaded.
+```
+operator text → load Core API context pack → Grok answer → number-check → Relay reply
+```
 
-## Capability checklist (verify in first hour — do not assume)
+- Grok may only use the context pack (incident, evidence, history, policy, asset, demo playbook).
+- Any number not present in that JSON fails the check → deterministic fallback.
+- **Acknowledge** still calls `acknowledge_incident` in Core API first (not LLM-only).
+- Disable with `GROK_INBOUND=false` in root `.env`.
 
-| Question | Verified? | Notes |
-|----------|-----------|-------|
-| Inbound SMS to agent? | ☐ | |
-| Outbound SMS from API? | ☐ | via `services/core-api/src/adapters/relay/` |
-| Voice calls? | ☐ | P1 for demo |
-| Webhooks for inbound? | ☐ | |
-| Trial / rate limits? | ☐ | |
-| Demo recipient phone | ☐ | teammate number only |
+## Run inbound (WebSocket — preferred)
+
+```bash
+# terminal A: make db && make api  (repo root, with .env keys)
+# terminal B:
+cd agents/relay
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # set CORE_API_TOKEN to match root .env
+python inbound_ws.py
+```
+
+Then in the Relay app, text the agent e.g.:
+
+- How bad is this?
+- What evidence do we have?
+- What should I do?
+- Acknowledge and mark investigating
+
+## HTTP stub (tunnel / unit demos)
+
+```bash
+uvicorn webhook:app --reload --port 8790
+curl -s localhost:8790/relay/inbound -H 'content-type: application/json' \
+  -d '{"text":"How bad is this?","incident_id":"INC-0001"}'
+```
 
 ## Architecture
 
 ```
-Outbound: Fetch / dashboard -> Core API notify_operator -> relay adapter -> Relay -> phone
-Inbound:  SMS/call -> Relay agent -> tools -> Core API -> SpacetimeDB -> dashboard
+Outbound: Core API notify_operator → relaySend → POST /v1/chats → your phone chat
+Inbound:  you text agent → WebSocket message.received → respond.py → Core API → POST /v1/chats/{id}/messages
 ```
 
-Tools map 1:1 to Core API actions (no Relay-specific writes).
+State changes only through Core API (`acknowledge_incident`, etc.). Actor: `RELAY_AGENT`.
 
-## Grounding (put in Relay system prompt)
+## Files
 
-See `prompts/system.md`.
-
-## Local webhook stub
-
-```bash
-pip install fastapi uvicorn httpx python-dotenv
-uvicorn webhook:app --reload --port 8790
-```
-
-Point Relay inbound webhook at your tunnel URL + `/relay/inbound`.
+| File | Role |
+|------|------|
+| `intent.py` | Keyword → intent |
+| `respond.py` | Intent → Core API → grounded reply |
+| `inbound_ws.py` | Relay WebSocket consumer |
+| `relay_client.py` | mark read + reply |
+| `core_api.py` | HTTP to Core API |
+| `response_playbook.json` | Demo resources for "what should I do?" |

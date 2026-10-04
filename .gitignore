@@ -16,3 +16,5 @@ dist/
 # SpacetimeDB module build output and local CLI state
 spacetime/module/dist/
 spacetime.local.json
+agents/relay/.relay_inbox.sqlite
+agents/relay/.venv/

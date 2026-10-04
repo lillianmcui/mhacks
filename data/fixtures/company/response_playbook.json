@@ -1,0 +1,48 @@
+{
+  "playbook_id": "basin-midstream-default",
+  "note": "Synthetic response resources for demo recommendations. Not live inventory.",
+  "resources": [
+    {
+      "resource_id": "crew-alpha",
+      "type": "leak_response_crew",
+      "label": "Leak response crew Alpha",
+      "area_id": "permian-north",
+      "eta_minutes_typical": 45,
+      "capabilities": ["isolation", "sniffer", "flare_check"]
+    },
+    {
+      "resource_id": "vac-truck-2",
+      "type": "vacuum_truck",
+      "label": "Vac truck 2",
+      "area_id": "permian-north",
+      "eta_minutes_typical": 90,
+      "capabilities": ["liquids_recovery"]
+    },
+    {
+      "resource_id": "env-contractor",
+      "type": "environmental_contractor",
+      "label": "On-call env contractor",
+      "area_id": "permian-north",
+      "eta_minutes_typical": 120,
+      "capabilities": ["sampling", "reporting"]
+    }
+  ],
+  "scripts": {
+    "MATCHED": [
+      "Acknowledge the alert",
+      "Dispatch nearest leak response crew to the associated asset",
+      "Confirm isolation only if the crew is trained and safe to do so",
+      "Mark INVESTIGATING when boots are on site"
+    ],
+    "AMBIGUOUS": [
+      "Acknowledge — do not pick a site until candidates are checked",
+      "Hold heavy equipment until match is confirmed",
+      "Loop in area supervisor"
+    ],
+    "NO_REGISTERED_ASSET": [
+      "Acknowledge and widen areal search",
+      "Hold isolation until a site is identified",
+      "Engage environmental lead / contractor"
+    ]
+  }
+}
