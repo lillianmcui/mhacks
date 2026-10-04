@@ -2,8 +2,58 @@
   {
     "asset_id": "TX-184",
     "facility_type": "compressor_station",
-    "latitude": 31.8508,
-    "longitude": -103.4495,
+    "latitude": 31.87329326333473,
+    "longitude": -103.85747711724866,
+    "operator_name": "Basin Midstream Co.",
+    "site_manager_contact_id": "contact-ops-lead",
+    "area_id": "permian-north",
+    "policy_id": "policy-default"
+  },
+  {
+    "asset_id": "TX-185",
+    "facility_type": "well",
+    "latitude": 31.8774,
+    "longitude": -103.8531,
+    "operator_name": "Basin Midstream Co.",
+    "site_manager_contact_id": "contact-ops-lead",
+    "area_id": "permian-north",
+    "policy_id": "policy-default"
+  },
+  {
+    "asset_id": "TX-186",
+    "facility_type": "well",
+    "latitude": 31.8724,
+    "longitude": -103.8671,
+    "operator_name": "Basin Midstream Co.",
+    "site_manager_contact_id": "contact-ops-lead",
+    "area_id": "permian-north",
+    "policy_id": "policy-default"
+  },
+  {
+    "asset_id": "TX-187",
+    "facility_type": "tank_battery",
+    "latitude": 31.8609,
+    "longitude": -103.8556,
+    "operator_name": "Basin Midstream Co.",
+    "site_manager_contact_id": "contact-ops-lead",
+    "area_id": "permian-north",
+    "policy_id": "policy-default"
+  },
+  {
+    "asset_id": "TX-188",
+    "facility_type": "well",
+    "latitude": 31.8884,
+    "longitude": -103.8736,
+    "operator_name": "Basin Midstream Co.",
+    "site_manager_contact_id": "contact-ops-lead",
+    "area_id": "permian-north",
+    "policy_id": "policy-default"
+  },
+  {
+    "asset_id": "TX-190",
+    "facility_type": "pipeline_segment",
+    "latitude": 31.8764,
+    "longitude": -103.8256,
     "operator_name": "Basin Midstream Co.",
     "site_manager_contact_id": "contact-ops-lead",
     "area_id": "permian-north",
