@@ -1,0 +1,23 @@
+[
+  {
+    "contact_id": "contact-ops-lead",
+    "name": "Ops Lead (teammate)",
+    "role": "site_manager",
+    "phone": "+17348825725",
+    "area_id": "permian-north"
+  },
+  {
+    "contact_id": "contact-area-mgr",
+    "name": "Area Manager (teammate)",
+    "role": "area_supervisor",
+    "phone": "+17348825725",
+    "area_id": "permian-north"
+  },
+  {
+    "contact_id": "contact-env",
+    "name": "Environmental Lead (teammate)",
+    "role": "environmental_lead",
+    "phone": "+17348825725",
+    "area_id": "permian-north"
+  }
+]

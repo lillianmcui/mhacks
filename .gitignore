@@ -1,9 +1,17 @@
 node_modules/
 .env
+.env.local
 .env.*
 !.env.example
+**/.env
+!**/.env.example
+.venv/
+__pycache__/
+dist/
 *.log
 .DS_Store
+*.png
+!data/fixtures/**/*.png
 
 # SpacetimeDB module build output and local CLI state
 spacetime/module/dist/

@@ -96,6 +96,31 @@ backend change (signatures in [`adapters.ts`](packages/contracts/src/adapters.ts
 
 Fixture file shapes are the ones in `services/core-api/sample-fixtures/`.
 
+## Track C (agents / data / Grok / Relay)
+
+```bash
+# Asset matching (+ priority once backend is merged)
+cd packages/rules && npm install && npm test
+
+# Briefing + Grok number-check
+node --experimental-strip-types --test \
+  services/core-api/src/briefing/template.test.ts \
+  services/core-api/src/adapters/grok/numberCheck.test.ts
+
+# Fetch against local mock (or real Core API after merge)
+cd agents/fetch
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# terminal 1: CORE_API_TOKEN=dev-bearer python mock_server.py
+# terminal 2: CORE_API_TOKEN=dev-bearer python cli.py "Handle the highest priority one"
+
+# Real MAIN fixtures (local token only — never commit)
+export CARBON_MAPPER_TOKEN=...
+python data/scripts/carbon_mapper_snapshot.py --plume tan20260813t190401c96s4001-B --out main
+```
+
+Grok / Relay keys go in the **repo-root** `.env` only (`GROK_API_KEY`, `RELAY_API_KEY`, `RELAY_API_BASE`, …). The Core API does not read `services/core-api/.env`. Agent processes use `agents/*/.env` for `CORE_API_BASE` / `CORE_API_TOKEN`.
+
 ## Tests
 
 ```bash

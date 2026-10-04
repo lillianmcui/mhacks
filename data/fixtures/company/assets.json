@@ -1,0 +1,12 @@
+[
+  {
+    "asset_id": "TX-184",
+    "facility_type": "compressor_station",
+    "latitude": 31.8508,
+    "longitude": -103.4495,
+    "operator_name": "Basin Midstream Co.",
+    "site_manager_contact_id": "contact-ops-lead",
+    "area_id": "permian-north",
+    "policy_id": "policy-default"
+  }
+]
