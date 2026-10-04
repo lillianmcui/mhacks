@@ -81,7 +81,8 @@ def run_handle_sequence(api: CoreApi, incident_id: str) -> dict[str, Any]:
     detail = api.get_incident(incident_id)
     api.record_action(incident_id, "get_incident", "Fetch agent sequence")
 
-    asset_id = detail.get("asset_id")
+    # get_incident nests the row under "incident"; older mocks returned it flat.
+    asset_id = (detail.get("incident") or {}).get("asset_id") or detail.get("asset_id")
     if asset_id:
         api.get_asset(str(asset_id))
         api.record_action(incident_id, "get_asset", str(asset_id))
