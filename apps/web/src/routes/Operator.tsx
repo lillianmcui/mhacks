@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatProvenance } from '@ch4se/contracts';
 import { Attribution } from '../components/Attribution';
+import { BriefingText } from '../components/BriefingText';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
 import { ReplayBanner } from '../components/ReplayBanner';
 import { StatusHeadline } from '../components/card/StatusHeadline';
@@ -65,7 +66,11 @@ export function Operator() {
                   <span className={`badge badge--${briefing.result.source.toLowerCase()}`}>{briefing.result.source}</span>
                 )}
               </div>
-              <p>{briefing.pending && !briefing.result ? 'Generating…' : briefing.result?.text}</p>
+              {briefing.result ? (
+                <BriefingText text={briefing.result.text} />
+              ) : (
+                briefing.pending && <p className="card__muted">Generating…</p>
+              )}
             </section>
 
             <div className="phone__actions">

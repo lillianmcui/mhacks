@@ -64,7 +64,7 @@ button { font: inherit; }
 .card__muted { margin: 0.15rem 0; color: var(--muted); font-size: 0.85rem; }
 .card__rule { margin-left: 0.6rem; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
 .card__candidates { margin: 0.3rem 0; padding-left: 1.1rem; }
-.card__briefing p { margin: 0.3rem 0 0; font-size: 0.9rem; white-space: pre-wrap; }
+.card__briefing .briefing { margin-top: 0.3rem; font-size: 0.9rem; }
 .card__briefing-head { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .card__footer { margin-top: 0.6rem; }
 
@@ -188,7 +188,13 @@ button { font: inherit; }
 .phone__body { display: flex; flex-direction: column; gap: 0.7rem; flex: 1; }
 .phone__body .headline { font-size: 1.2rem; }
 .phone__briefing { background: var(--panel-2); border-radius: 10px; padding: 0.7rem; }
-.phone__briefing p { margin: 0.4rem 0 0; white-space: pre-wrap; }
+.phone__briefing .briefing { margin-top: 0.4rem; }
+
+.briefing { display: flex; flex-direction: column; gap: 0.2rem; line-height: 1.35; }
+.briefing__line { margin: 0; }
+.briefing__label { font-weight: 700; color: var(--muted); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; }
+.briefing__list { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.briefing__gap { height: 0.35rem; }
 .phone__actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: auto; }
 .phone__empty { color: var(--muted); text-align: center; margin-top: 3rem; }
 .phone__footer { text-align: center; }

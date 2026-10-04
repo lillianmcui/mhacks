@@ -218,7 +218,17 @@ export class MockBackend {
 
   private briefing(inc: Incident): Briefing {
     return {
-      text: `[MOCK TEMPLATE] Replayed historical observation. ${inc.priority} priority methane plume; associated asset ${inc.asset_id ?? 'none'}. Rule ${inc.policy_rule_id}.`,
+      text: [
+        `${inc.priority} priority · ${inc.incident_id} (mock)`,
+        'Replayed historical observation.',
+        '',
+        `Asset: ${inc.asset_id ?? 'no registered asset in range'}`,
+        `Rule: ${inc.policy_rule_id}`,
+        '',
+        'Next:',
+        '- Acknowledge, then check the site',
+        '- Mark investigating once a team is on it',
+      ].join('\n'),
       source: 'TEMPLATE',
     };
   }

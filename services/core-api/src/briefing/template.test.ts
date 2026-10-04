@@ -108,3 +108,12 @@ test("operator quotes display strings", () => {
   assert.ok(text.includes("120 ± 40 kg CH4/hr (Carbon Mapper estimate)"));
   assert.equal(text.includes("caused by"), false);
 });
+
+test("operator is short labelled lines with no markdown or field names", () => {
+  const text = renderTemplateBriefing(sample(), "operator");
+  assert.match(text, /^HIGH priority · inc-1\n/);
+  assert.match(text, /\nRelease: 120 ± 40/);
+  assert.match(text, /\nNext:\n- /);
+  assert.ok(text.split("\n").length <= 14);
+  assert.equal(/\*\*|display\.|match_result/.test(text), false);
+});
