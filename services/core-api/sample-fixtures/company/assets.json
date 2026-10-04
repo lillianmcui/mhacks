@@ -1,0 +1,22 @@
+[
+  {
+    "asset_id": "SAMPLE-101",
+    "facility_type": "compressor_station",
+    "latitude": 31.7512,
+    "longitude": -103.8204,
+    "operator_name": "Sample Basin Midstream Co.",
+    "site_manager_contact_id": "SAMPLE-C1",
+    "area_id": "SAMPLE-AREA-1",
+    "policy_id": "SAMPLE-POL-1"
+  },
+  {
+    "asset_id": "SAMPLE-102",
+    "facility_type": "well",
+    "latitude": 31.802,
+    "longitude": -103.76,
+    "operator_name": "Sample Basin Midstream Co.",
+    "site_manager_contact_id": "SAMPLE-C1",
+    "area_id": "SAMPLE-AREA-1",
+    "policy_id": "SAMPLE-POL-1"
+  }
+]

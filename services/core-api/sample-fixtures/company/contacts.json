@@ -1,0 +1,5 @@
+[
+  { "contact_id": "SAMPLE-C1", "name": "Sample Site Manager", "role": "site_manager", "phone": "+15555550101", "area_id": "SAMPLE-AREA-1" },
+  { "contact_id": "SAMPLE-C2", "name": "Sample Area Supervisor", "role": "area_supervisor", "phone": "+15555550102", "area_id": "SAMPLE-AREA-1" },
+  { "contact_id": "SAMPLE-C3", "name": "Sample Environmental Lead", "role": "environmental_lead", "phone": "+15555550103", "area_id": "SAMPLE-AREA-1" }
+]

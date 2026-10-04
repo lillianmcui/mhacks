@@ -1,0 +1,16 @@
+{
+  "plume_id": "sample20260101t000000-A",
+  "scene_id": "sample20260101t000000",
+  "plume_latitude": 31.752,
+  "plume_longitude": -103.8195,
+  "instrument": "tan",
+  "ipcc_sector": "Oil & Gas (1B2)",
+  "emission_auto": 432.1,
+  "emission_uncertainty_auto": 98.7,
+  "wind_speed_avg_auto": 3.4,
+  "wind_direction_avg_auto": 210.5,
+  "wind_source_auto": "HRRR",
+  "plume_quality": "good",
+  "plume_png": null,
+  "source_name": "SAMPLE_SOURCE_0001"
+}

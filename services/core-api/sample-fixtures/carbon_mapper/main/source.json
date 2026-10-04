@@ -1,0 +1,9 @@
+{
+  "source_name": "SAMPLE_SOURCE_0001",
+  "persistence": 0.75,
+  "emission_auto": 401.5,
+  "emission_uncertainty_auto": 110.2,
+  "observation_dates": ["2025-09-14", "2025-11-02", "2025-12-09", "2026-01-01"],
+  "detection_dates": ["2025-09-14", "2025-12-09", "2026-01-01"],
+  "explanation": "Sample record, not a real Carbon Mapper source."
+}
