@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { formatProvenance } from '@ch4se/contracts';
 import { Attribution } from '../components/Attribution';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
@@ -37,6 +37,9 @@ export function Operator() {
     <div className="operator">
       <div className="phone">
         <header className="phone__top">
+          <Link className="phone__back" to="/">
+            ← Dashboard
+          </Link>
           <span className="brand brand--sm">
             CH<sub>4</sub>SE · Operator
           </span>

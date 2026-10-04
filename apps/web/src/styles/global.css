@@ -180,7 +180,10 @@ button { font: inherit; }
   width: 100%; max-width: 400px; min-height: 720px; display: flex; flex-direction: column; gap: 0.8rem;
   padding: 1rem; background: var(--panel); border: 1px solid var(--border); border-radius: 24px;
 }
-.phone__top { display: flex; justify-content: space-between; align-items: center; }
+.phone__top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.25rem 0.5rem; }
+.phone__top .brand { white-space: nowrap; }
+.phone__back { color: var(--muted); font-size: 0.8rem; text-decoration: none; white-space: nowrap; }
+.phone__back:hover { color: inherit; }
 .phone .replay-banner { flex: none; font-size: 0.8rem; border-radius: 10px; }
 .phone__body { display: flex; flex-direction: column; gap: 0.7rem; flex: 1; }
 .phone__body .headline { font-size: 1.2rem; }
