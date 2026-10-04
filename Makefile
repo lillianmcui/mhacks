@@ -11,7 +11,7 @@ install: ## npm install in every backend package
 	@for dir in $(PACKAGES); do echo "== $$dir"; (cd $$dir && npm install --no-fund --no-audit) || exit 1; done
 
 db: ## run a local SpacetimeDB on 127.0.0.1:3000 (foreground)
-	spacetime start --listen-addr 127.0.0.1:3000
+	exec spacetime start --listen-addr 127.0.0.1:3000
 
 publish: ## build and publish the module to the local server, keeping data
 	cd spacetime/module && spacetime publish $(DB) --server local --yes
