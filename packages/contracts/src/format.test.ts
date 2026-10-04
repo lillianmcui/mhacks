@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { canTransition, INCIDENT_STATUSES } from './enums.ts';
 import {
   formatAssociatedAsset,
+  formatDate,
   formatEmission,
   formatHistory,
   formatProvenance,
@@ -24,6 +25,21 @@ test('formatProvenance labels the instrument and normalizes the timestamp', () =
     formatProvenance({ provider: 'Carbon Mapper', instrument: 'tan', scene_timestamp: '2026-08-13T19:04:01Z' }),
     'Carbon Mapper · Tanager · 2026-08-13 19:04 UTC'
   );
+});
+
+test('a timestamp with no offset is read as UTC, whatever the local zone', () => {
+  const zone = process.env.TZ;
+  process.env.TZ = 'America/Detroit';
+  try {
+    assert.equal(formatTimestamp('2026-08-13T19:04:00'), '2026-08-13 19:04 UTC');
+    assert.equal(formatTimestamp('2026-08-13 19:04:00.123'), '2026-08-13 19:04 UTC');
+    assert.equal(formatTimestamp('2026-08-13T19:04:00Z'), '2026-08-13 19:04 UTC');
+    assert.equal(formatTimestamp('2026-08-13T19:04:00-04:00'), '2026-08-13 23:04 UTC');
+    assert.equal(formatDate('2026-08-13T23:30:00'), '2026-08-13');
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
 });
 
 test('formatTimestamp leaves unparseable input alone', () => {

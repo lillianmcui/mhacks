@@ -22,6 +22,7 @@ import {
 } from '@ch4se/contracts';
 import { ApiError } from './errors.ts';
 import type { Ports } from './ports.ts';
+import { standinTemplateBriefing } from './standins/briefing.ts';
 import type { Store } from './store.ts';
 import {
   assetHistory,
@@ -91,7 +92,14 @@ export function createActions({ store, ports, newId, log = () => {} }: ActionDep
         log(`grok failed for ${incident_id} (${error instanceof Error ? error.message : String(error)}); using template`);
       }
     }
-    return { text: ports.renderTemplateBriefing(input, kind), source: 'TEMPLATE' };
+    // The template is the last resort; if it throws, the stand-in still says
+    // something true rather than failing the alert.
+    try {
+      return { text: ports.renderTemplateBriefing(input, kind), source: 'TEMPLATE' };
+    } catch (error) {
+      log(`template failed for ${incident_id} (${error instanceof Error ? error.message : String(error)}); using stand-in`);
+      return { text: standinTemplateBriefing(input, kind), source: 'TEMPLATE' };
+    }
   }
 
   async function recordAction(incident_id: string, actor: Actor, action_name: string, detail: string) {
