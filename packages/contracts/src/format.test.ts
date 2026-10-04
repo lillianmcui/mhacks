@@ -6,6 +6,7 @@ import {
   formatDate,
   formatEmission,
   formatHistory,
+  formatPersistence,
   formatProvenance,
   formatStatusHeadline,
   formatTimestamp,
@@ -40,6 +41,13 @@ test('a timestamp with no offset is read as UTC, whatever the local zone', () =>
     if (zone === undefined) delete process.env.TZ;
     else process.env.TZ = zone;
   }
+});
+
+test('formatPersistence keeps at most two decimals', () => {
+  assert.equal(formatPersistence(0.4117647058823529), 'persistence 0.41 (Carbon Mapper)');
+  assert.equal(formatPersistence(0.75), 'persistence 0.75 (Carbon Mapper)');
+  assert.equal(formatPersistence(0.6), 'persistence 0.6 (Carbon Mapper)');
+  assert.equal(formatPersistence(null), null);
 });
 
 test('formatTimestamp leaves unparseable input alone', () => {

@@ -151,6 +151,20 @@ function pickPlume(data: unknown, path: string): Json {
   return rows[0];
 }
 
+/**
+ * The plume origin as the catalog API gives it: a GeoJSON Point, which is
+ * [longitude, latitude]. The CSV export has plume_latitude / plume_longitude
+ * instead.
+ */
+function geometryOrigin(plume: Json): { latitude: number; longitude: number } | undefined {
+  const geometry = plume.geometry_json;
+  if (!isObject(geometry) || geometry.type !== 'Point' || !Array.isArray(geometry.coordinates)) return undefined;
+  const [longitude, latitude] = geometry.coordinates as unknown[];
+  if (typeof longitude !== 'number' || typeof latitude !== 'number') return undefined;
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return undefined;
+  return { latitude, longitude };
+}
+
 /** Scene timestamp for a plume: joined on scene_id, from the scene's `timestamp`. */
 function sceneTimestamp(scenesPath: string, scene_id: string): string | undefined {
   if (!existsSync(scenesPath)) return undefined;
@@ -167,9 +181,14 @@ function sceneTimestamp(scenesPath: string, scene_id: string): string | undefine
 
 /**
  * `<dir>/carbon_mapper/<name>/{plume.json,source.json,scenes.geojson}`.
- * Provider field names are Product Direction §5.3's; the only normalization is
- * the one the spec calls for: `datetime` (CSV) or the joined scene `timestamp`
- * become `scene_timestamp`.
+ * Provider field names are Product Direction §5.3's. Both shapes Carbon Mapper
+ * serves are accepted, and values are never altered:
+ *   - `datetime` (CSV) or the joined scene `timestamp` become `scene_timestamp`
+ *   - the origin is `plume_latitude` / `plume_longitude` (CSV) or the
+ *     `geometry_json` Point (catalog API)
+ *   - the sector is `ipcc_sector` (CSV) or `sector` (catalog API)
+ *   - the source's persistence and emission are top-level, or nested under
+ *     `source` (catalog API)
  */
 export function loadEventFixtures(fixturesDir: string, name = 'main'): EventFixtures {
   const dir = join(fixturesDir, 'carbon_mapper', name);
@@ -183,7 +202,8 @@ export function loadEventFixtures(fixturesDir: string, name = 'main'): EventFixt
   if (existsSync(sourcePath)) {
     const raw = readJson(sourcePath);
     if (!isObject(raw)) throw new FixtureError(`${sourcePath} must be a JSON object`);
-    const s = new Reader(raw, 'source.json');
+    // The catalog API nests the summary numbers under `source`.
+    const s = new Reader({ ...(isObject(raw.source) ? raw.source : {}), ...raw }, 'source.json');
     source = {
       source_name: s.string('source_name'),
       persistence: s.optionalNumber('persistence'),
@@ -202,15 +222,16 @@ export function loadEventFixtures(fixturesDir: string, name = 'main'): EventFixt
   if (joined !== undefined && plume.scene_timestamp === undefined && plume.datetime === undefined) {
     plume.scene_timestamp = joined;
   }
+  const origin = geometryOrigin(plume);
   const event = {
     event_id: eventIdFor(plume_id),
     plume_id,
     scene_id,
     scene_timestamp: p.string('scene_timestamp', 'datetime'),
-    plume_latitude: p.number('plume_latitude'),
-    plume_longitude: p.number('plume_longitude'),
+    plume_latitude: plume.plume_latitude === undefined && origin ? origin.latitude : p.number('plume_latitude'),
+    plume_longitude: plume.plume_longitude === undefined && origin ? origin.longitude : p.number('plume_longitude'),
     instrument: p.string('instrument'),
-    ipcc_sector: p.optionalString('ipcc_sector'),
+    ipcc_sector: p.optionalString('ipcc_sector', 'sector'),
     emission_auto: p.number('emission_auto'),
     emission_uncertainty_auto: p.optionalNumber('emission_uncertainty_auto'),
     wind_speed_avg_auto: p.optionalNumber('wind_speed_avg_auto'),
