@@ -23,7 +23,10 @@ CORE_API_TOKEN=dev-bearer python cli.py "Do we have any unresolved methane incid
 CORE_API_TOKEN=dev-bearer python cli.py "Handle the highest priority one"
 ```
 
-For Agentverse (`agent.py`): `pip install -r requirements-agent.txt`.
+For Agentverse / ASI:One (`agent.py`): `pip install -r requirements-agent.txt`, then `python agent.py`.
+The agent speaks the Agent Chat Protocol. On first run, open the inspector link it prints while
+logged in to Agentverse and choose Connect -> Mailbox. It is reachable only while the process runs,
+and its identity comes from `FETCH_AGENT_SEED`, so keep that value stable and private.
 
 Against the real backend, prefer `handle_highest_priority` (same path as the dashboard fallback). Behaviours to expect:
 

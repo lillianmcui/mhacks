@@ -33,7 +33,7 @@ interface RelayMe {
  */
 export async function relaySend(input: RelaySendInput): Promise<RelaySendResult> {
   const apiKey = process.env.RELAY_API_KEY;
-  const base = (process.env.RELAY_API_BASE ?? "https://api.relayapp.im").replace(/\/$/, "");
+  const base = (process.env.RELAY_API_BASE || "https://api.relayapp.im").replace(/\/$/, "");
   if (!apiKey) {
     throw new Error("RELAY_API_KEY is not configured");
   }

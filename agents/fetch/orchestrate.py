@@ -34,6 +34,74 @@ class CoreApiError(RuntimeError):
         self.message = message
 
 
+UNACKNOWLEDGED = ("DETECTED", "ANALYZED", "ALERT_SENT")
+
+HELP = (
+    "I am the CH4SE methane incident response agent. "
+    "Ask: 'Do we have any unresolved methane incidents?' "
+    "or 'Handle the highest priority one.'"
+)
+
+EXPLAIN = """Here is what happens when I handle the highest priority incident. Nothing is sent until you tell me to handle it.
+
+1. I pick the most urgent methane incident that nobody has been alerted about yet (priority first, then oldest).
+2. I load the incident and the provider observation behind it.
+3. I look up the registered asset associated with the plume, or the nearest candidates when the match is ambiguous.
+4. I read the escalation policy to find the rule that fired and who it routes to.
+5. I generate a short briefing. Every number in it is quoted from the provider's estimate, never computed by me.
+6. I notify the assigned operator and record each step on the incident timeline.
+
+If the operator was already alerted I do not send a second message. The operator acknowledges from the alert or the CH4SE dashboard.
+
+To run it, say: 'Handle the highest priority one.'"""
+
+# A question about how handling works must never trigger it.
+EXPLAIN_CUES = (
+    "what happens",
+    "walk me through",
+    "how do you",
+    "how does",
+    "how would",
+    "how will",
+    "explain",
+    "what can you",
+    "what do you",
+    "what would",
+    "describe",
+)
+STATUS_CUES = (
+    "unresolved",
+    "open incident",
+    "any incidents",
+    "any unresolved",
+    "incident",
+    "asset",
+    "urgent",
+    "status",
+    "emission",
+    "leak",
+    "plume",
+    "methane",
+)
+
+
+def _incident_lines(incident: dict) -> list[str]:
+    """One incident, using the Core API's display strings for every number."""
+    display = incident.get("display") or {}
+    asset = incident.get("asset_id") or "unmatched site"
+    ftype = incident.get("facility_type") or "facility"
+    priority = (incident.get("priority_display") or incident.get("priority") or "").strip()
+    headline = display.get("headline") or incident.get("status") or ""
+    lines = [f"{incident.get('incident_id', '?')}: priority {priority}. Status: {headline}.".replace("  ", " ")]
+    lines.append(f"- {display.get('asset') or f'Associated with {asset} {ftype}'}")
+    if display.get("emission"):
+        lines.append(f"- Emission estimate: {display['emission']}")
+    if display.get("provenance"):
+        replay = " (real historical observation, replayed through CH4SE)" if incident.get("is_replay") else ""
+        lines.append(f"- Observation: {display['provenance']}{replay}")
+    return lines
+
+
 def summarize_open(incidents: list[dict]) -> str:
     if not incidents:
         return "No unresolved methane incidents in CH4SE right now."
@@ -41,11 +109,28 @@ def summarize_open(incidents: list[dict]) -> str:
     top = incidents[0]
     asset = top.get("asset_id") or "unmatched site"
     ftype = top.get("facility_type") or "facility"
-    priority = (top.get("priority_display") or top.get("priority") or "").strip()
-    head = (
-        f"{count} unresolved. Highest priority is associated with {asset} {ftype}."
-    )
-    return f"{head} {priority}".strip()
+    noun = "incident" if count == 1 else "incidents"
+    lines = [
+        f"{count} unresolved methane {noun} in CH4SE. "
+        f"Highest priority is associated with {asset} {ftype}.",
+        "",
+        *_incident_lines(top),
+    ]
+    for other in incidents[1:]:
+        display = other.get("display") or {}
+        lines.append(
+            f"Also open: {other.get('incident_id', '?')}, priority {other.get('priority', '?')}, "
+            f"{display.get('headline') or other.get('status') or ''}".rstrip(", ")
+        )
+    waiting = [i for i in incidents if i.get("status") in UNACKNOWLEDGED]
+    lines.append("")
+    if any(i.get("status") != "ALERT_SENT" for i in waiting):
+        lines.append("Nobody has been alerted yet. Say 'Handle the highest priority one' to brief and notify the assigned operator.")
+    elif waiting:
+        lines.append("The operator has been alerted and has not acknowledged yet.")
+    elif "status" in top:
+        lines.append("Every open incident has been acknowledged, so there is nothing waiting to be handled.")
+    return "\n".join(lines).strip()
 
 
 def format_handle_result(result: dict[str, Any]) -> str:
@@ -116,25 +201,24 @@ def run_handle_sequence(api: CoreApi, incident_id: str) -> dict[str, Any]:
     }
 
 
+def _report_open(api: CoreApi) -> str:
+    incidents = api.get_open_incidents()
+    if incidents:
+        api.record_action(
+            str(incidents[0]["incident_id"]),
+            "get_open_incidents",
+            f"count={len(incidents)}",
+        )
+    return summarize_open(incidents)
+
+
 def handle_user_request(api: CoreApi, message: str) -> str:
     text = (message or "").strip().lower()
 
-    if (
-        "unresolved" in text
-        or "open incident" in text
-        or "any incidents" in text
-        or "any unresolved" in text
-    ):
-        incidents = api.get_open_incidents()
-        if incidents:
-            api.record_action(
-                str(incidents[0]["incident_id"]),
-                "get_open_incidents",
-                f"count={len(incidents)}",
-            )
-        return summarize_open(incidents)
+    if any(cue in text for cue in EXPLAIN_CUES):
+        return EXPLAIN
 
-    if "handle" in text and "priority" in text:
+    if "handle" in text and ("priority" in text or "urgent" in text):
         try:
             result = api.handle_highest_priority()
             if isinstance(result, dict):
@@ -142,7 +226,11 @@ def handle_user_request(api: CoreApi, message: str) -> str:
             return str(result)
         except CoreApiError as e:
             if e.code == "NO_OPEN_INCIDENTS":
-                return "No open incidents to handle."
+                # Nothing is waiting for an alert; say what is still open instead.
+                remaining = api.get_open_incidents()
+                if not remaining:
+                    return "No open incidents to handle."
+                return "Nothing to handle: no incident is waiting for an alert.\n\n" + summarize_open(remaining)
             # Prefer backend one-shot when available; fall back only if action missing.
             if e.code != "NOT_FOUND":
                 raise
@@ -154,7 +242,7 @@ def handle_user_request(api: CoreApi, message: str) -> str:
         out = run_handle_sequence(api, incident_id)
         return f"Handled {incident_id}. SMS briefing:\n{out['summary']}"
 
-    return (
-        "Ask: 'Do we have any unresolved methane incidents?' "
-        "or 'Handle the highest priority one.'"
-    )
+    if any(cue in text for cue in STATUS_CUES):
+        return _report_open(api)
+
+    return HELP

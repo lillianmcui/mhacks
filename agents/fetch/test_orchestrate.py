@@ -147,6 +147,56 @@ class OrchestrateTests(unittest.TestCase):
         reply = handle_user_request(api, "Handle the highest priority one")
         self.assertEqual(reply, "No open incidents to handle.")
 
+    def test_explaining_never_handles(self) -> None:
+        api = FakeApi()
+        reply = handle_user_request(
+            api, "Can you walk me through what happens when you handle the top priority incident?"
+        )
+        self.assertIn("Nothing is sent until you tell me", reply)
+        self.assertEqual(api.calls, [])
+
+    def test_summary_quotes_display_strings(self) -> None:
+        text = summarize_open(
+            [
+                {
+                    "incident_id": "INC-0001",
+                    "asset_id": "TX-184",
+                    "facility_type": "compressor_station",
+                    "priority": "HIGH",
+                    "status": "ANALYZED",
+                    "is_replay": True,
+                    "display": {
+                        "headline": "HIGH — UNACKNOWLEDGED",
+                        "asset": "Associated asset: TX-184 compressor_station (22 m from plume origin)",
+                        "emission": "432 ± 99 kg CH4/hr (Carbon Mapper estimate)",
+                        "provenance": "Carbon Mapper · Tanager · 2026-01-01 00:00 UTC",
+                    },
+                }
+            ]
+        )
+        self.assertIn("432 ± 99 kg CH4/hr (Carbon Mapper estimate)", text)
+        self.assertIn("Associated asset: TX-184 compressor_station (22 m from plume origin)", text)
+        self.assertIn("replayed through CH4SE", text)
+        self.assertIn("Handle the highest priority one", text)
+
+    def test_asset_question_reports_the_top_incident(self) -> None:
+        api = FakeApi()
+        reply = handle_user_request(api, "Which asset is associated with the most urgent incident?")
+        self.assertIn("TX-184", reply)
+
+    def test_nothing_to_handle_lists_what_is_open(self) -> None:
+        api = FakeApi()
+        api._open = [{"incident_id": "inc-1", "asset_id": "TX-184", "priority": "HIGH", "status": "INVESTIGATING"}]
+
+        def no_open() -> dict:
+            raise CoreApiError("NO_OPEN_INCIDENTS", "none")
+
+        api.handle_highest_priority = no_open  # type: ignore[method-assign]
+        reply = handle_user_request(api, "Handle the highest priority one")
+        self.assertIn("Nothing to handle", reply)
+        self.assertIn("inc-1", reply)
+        self.assertIn("nothing waiting to be handled", reply)
+
     def test_help_text(self) -> None:
         api = FakeApi()
         reply = handle_user_request(api, "hello")
