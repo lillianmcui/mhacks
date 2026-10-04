@@ -22,6 +22,23 @@ class NumberCheckTests(unittest.TestCase):
         )
         self.assertIn("120", extract_numbers("120 ± 40"))
 
+    def test_allows_operator_stated_number(self) -> None:
+        assert_numbers_grounded(
+            "Got it — your truck is 40 min out. Widen search meanwhile.",
+            {
+                "operator_question": "vac truck is 40 minutes out",
+                "ch4se_context": {"display": {"emission": "120 ± 40"}},
+            },
+        )
+
+
+class NormalizeTests(unittest.TestCase):
+    def test_unwraps_json_reply(self) -> None:
+        from grok_inbound import _normalize_reply
+
+        out = _normalize_reply('{"reply": "Widen search. Match uncertain."}')
+        self.assertEqual(out, "Widen search. Match uncertain.")
+
 
 class FreeFormTests(unittest.TestCase):
     @patch("respond.answer_with_grok")
