@@ -77,9 +77,10 @@ def build_context_pack(incident_id: str) -> dict[str, Any]:
         "asset": asset,
         "response_playbook": playbook,
         "grounding_notes": [
-            "Quote display strings verbatim for any quantity or date.",
-            "Playbook resources are synthetic demo inventory, not live dispatch proof.",
-            "This demo may be a replayed historical observation.",
+            "Answer the operator's message first; use these facts as support, not a form to fill.",
+            "When citing quantities or dates, use display strings exactly.",
+            "Playbook resources are demo inventory, not live dispatch proof.",
+            "This demo may be a replayed historical observation — mention casually if relevant.",
         ],
     }
 
@@ -106,7 +107,8 @@ def handle_operator_text(text: str, *, incident_id: str | None = None) -> str:
                     "system_message": ack_msg,
                 }
                 return answer_with_grok(
-                    "Confirm acknowledgement briefly to the operator.",
+                    f"Operator said: {text}\n\n"
+                    "Confirm the acknowledgement in a natural reply, then offer the next useful beat.",
                     ctx,
                 )
             except Exception as e:  # noqa: BLE001

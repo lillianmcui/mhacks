@@ -11,22 +11,23 @@ import httpx
 
 from number_check import assert_numbers_grounded
 
-SYSTEM = """You are the CH4SE methane incident assistant texting a field operator on Relay.
+SYSTEM = """You are a sharp field ops partner on Relay helping with a CH4SE methane incident.
+Text like a calm, experienced colleague — natural, direct, a little warm. Not a checklist bot.
 
-You accept ANY operator message — questions, status updates, short slang, or free-form prose.
-Answer in plain SMS text (never JSON, never markdown code fences).
+How to reply:
+- Answer the operator's actual question or update first. Mirror their situation (waiting on a truck, deciding next step, confused about the alert, etc.).
+- Write plain SMS text: short paragraphs or a few sentences. No JSON, no markdown, no bold, no bullet dumps unless they really help.
+- Sound human: contractions are fine, light conversational phrasing is fine. Avoid robotic openers like "Match uncertain (NO_REGISTERED_ASSET)." or labeled field dumps ("Emission:", "Persistence:", "Priority:").
+- Weave facts into advice. Example vibe: "Yeah — that plume's still showing about 432 ± 99 kg CH4/hr from Carbon Mapper, and we don't have a registered asset tied to it yet, so I'd widen the search while you wait on the vac truck."
+- If you don't have something in CH4SE, say so casually and still be useful with what you do know.
+- You can acknowledge what the operator told you (their ETA, plan, etc.) without treating it as system data.
 
-Hard rules:
-- Answer ONLY using the JSON context pack. If the pack lacks the answer, say you do not have that in CH4SE and suggest what you can answer.
-- You may acknowledge facts the operator stated (e.g. their own ETA) without treating them as CH4SE data.
-- Quote every emission, uncertainty, timestamp, persistence, count, and distance using the exact display strings from the pack when you mention them.
-- Never invent observations, assets, phone numbers, ETAs, or quantities that are not in the pack or the operator message.
-- Never rewrite dates into prose (do not turn 2026-01-01 into January 1).
-- Say "associated asset" / "nearest registered asset" using the pack's wording; never "caused by".
-- If match_result is not MATCHED, say the match is uncertain.
-- If is_replay / replay_notice is present, say this is a replayed historical observation.
-- Keep replies short for mobile: prefer under 12 lines.
-- Do not claim you dispatched real crews unless the pack says a Core API action already did so.
+Stay honest (don't invent):
+- Stick to the context pack for CH4SE facts. Don't invent assets, phones, dispatches, ETAs, or measurements.
+- When you mention rates, uncertainties, timestamps, persistence, or distances, use the pack's exact display strings (don't round or rephrase numbers/dates).
+- If the match isn't MATCHED, make clear the site link is uncertain — in plain language, not enum codes.
+- If this is a replayed historical observation, mention that once, naturally.
+- Don't claim you already dispatched crews unless the pack says a Core API action did.
 """
 
 _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.I | re.M)
@@ -58,12 +59,12 @@ def answer_with_grok(question: str, context: dict[str, Any]) -> str:
         assert_numbers_grounded(text, grounding)
         return text
     except ValueError as first_err:
-        # One retry with a stricter reminder instead of dropping to scripted intents.
+        # One retry: keep the same natural voice, just fix invented numbers.
         retry_system = (
             SYSTEM
-            + "\n\nYour previous draft failed grounding. Reply again in plain text. "
-            + "Use only numbers that appear in the context pack or the operator question. "
-            + f"Failure detail: {first_err}"
+            + "\n\nQuick fix: your last draft used a number that isn't in the pack or the "
+            + "operator's message. Rewrite in the same natural voice, but only use numbers "
+            + f"from those sources. ({first_err})"
         )
         text = _normalize_reply(_call_grok(api_key, model, retry_system, user_payload))
         assert_numbers_grounded(text, grounding)
@@ -73,7 +74,7 @@ def answer_with_grok(question: str, context: dict[str, Any]) -> str:
 def _call_grok(api_key: str, model: str, system: str, user_content: str) -> str:
     payload = {
         "model": model,
-        "temperature": 0.2,
+        "temperature": float(os.environ.get("GROK_INBOUND_TEMPERATURE", "0.65")),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user_content},
@@ -101,6 +102,8 @@ def _call_grok(api_key: str, model: str, system: str, user_content: str) -> str:
 def _normalize_reply(text: str) -> str:
     """Unwrap accidental JSON / fences so Relay always gets plain SMS text."""
     cleaned = _FENCE_RE.sub("", text).strip()
+    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
     if cleaned.startswith("{") and cleaned.endswith("}"):
         try:
             obj = json.loads(cleaned)
@@ -110,5 +113,5 @@ def _normalize_reply(text: str) -> str:
             for key in ("reply", "answer", "text", "message"):
                 val = obj.get(key)
                 if isinstance(val, str) and val.strip():
-                    return val.strip()
+                    return _normalize_reply(val.strip())
     return cleaned
