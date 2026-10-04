@@ -123,6 +123,61 @@ test('notify_operator: a FAILED delivery is recorded but does not move the statu
   assert.equal(store.incidents()[0]!.status, 'ANALYZED');
 });
 
+test('handle_highest_priority: a FAILED delivery is a failed step', async () => {
+  const { actions } = await setup({ relay: async () => ({ delivery_status: 'FAILED', provider_ref: 'x' }) });
+  const handled = await actions.handle_highest_priority({ actor: 'FETCH_AGENT' });
+  assert.equal(handled.steps.at(-1)?.ok, false);
+  assert.equal(handled.alert?.delivery_status, 'FAILED');
+  assert.equal(handled.incident.status, 'ANALYZED');
+});
+
+test('handle_highest_priority sends the briefing it returns, and never sends it twice', async () => {
+  let calls = 0;
+  const { actions, store } = await setup({ grok: async () => ({ text: `grok #${++calls}` }) });
+  const first = await actions.handle_highest_priority({ actor: 'FETCH_AGENT' });
+  assert.equal(calls, 1, 'one briefing per run');
+  assert.equal(store.alerts()[0]?.message_text, first.briefing?.text);
+
+  const second = await actions.handle_highest_priority({ actor: 'FETCH_AGENT' });
+  assert.equal(store.alerts().length, 1, 'already ALERT_SENT: nothing sent again');
+  assert.equal(second.incident.incident_id, ID);
+  assert.equal(second.alert?.alert_id, first.alert?.alert_id);
+  assert.equal(second.steps.at(-1)?.ok, true);
+  assert.match(second.steps.at(-1)!.detail, /already alerted/);
+});
+
+test('handle_highest_priority moves on to an incident nobody has been alerted about', async () => {
+  const { actions, store } = await setup();
+  await actions.handle_highest_priority({ actor: 'FETCH_AGENT' });
+  const base = loadEventFixtures(SAMPLE_FIXTURES_DIR, 'main');
+  const low = await replayEvent(
+    store,
+    { event: { ...base.event, event_id: 'EVT-low', plume_id: 'low', source_name: 'SRC-low', emission_auto: 5 }, source: null },
+    standinMatchAsset
+  );
+  assert.equal(low.incident.priority, 'LOW');
+  const handled = await actions.handle_highest_priority({ actor: 'FETCH_AGENT' });
+  assert.equal(handled.incident.incident_id, low.incident.incident_id);
+  assert.equal(store.alerts().length, 2);
+});
+
+test('notify_operator: re-notify is allowed until acknowledged, then rejected without sending', async () => {
+  let sends = 0;
+  const { actions, store } = await setup({
+    relay: async () => {
+      sends++;
+      return { delivery_status: 'SENT', provider_ref: 'x' };
+    },
+  });
+  await actions.notify_operator({ incident_id: ID, channel: 'SMS' });
+  await actions.notify_operator({ incident_id: ID, channel: 'CALL' });
+  assert.equal(sends, 2);
+  await actions.acknowledge_incident({ incident_id: ID, contact_id: 'SAMPLE-C1', channel: 'SMS' });
+  assert.equal(await codeOf(actions.notify_operator({ incident_id: ID, channel: 'SMS' })), 'INVALID_TRANSITION');
+  assert.equal(sends, 2);
+  assert.equal(store.alerts().length, 2);
+});
+
 test('set_incident_status cannot acknowledge; that needs acknowledge_incident', async () => {
   const { actions, store } = await setup();
   assert.equal(

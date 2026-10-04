@@ -100,11 +100,23 @@ export function createActions({ store, ports, newId, log = () => {} }: ActionDep
     return { action_id };
   }
 
-  async function notifyOperator(incident_id: string, channel: 'SMS' | 'CALL', actor: Actor): Promise<NotifyResult> {
+  // `prepared` lets a caller that already generated the briefing send exactly
+  // that text instead of generating a second one.
+  async function notifyOperator(
+    incident_id: string,
+    channel: 'SMS' | 'CALL',
+    actor: Actor,
+    prepared?: Briefing
+  ): Promise<NotifyResult> {
     const incident = requireIncident(store, incident_id);
+    // Re-notifying after ALERT_SENT is allowed (e.g. escalating SMS to CALL);
+    // once someone has acknowledged there is nobody left to alert.
+    if (!UNACKNOWLEDGED_STATUSES.includes(incident.status)) {
+      throw new ApiError('INVALID_TRANSITION', `incident ${incident_id} is ${incident.status}; no notification sent`);
+    }
     const contact = store.contacts().find(c => c.contact_id === incident.assigned_contact_id);
     if (!contact) throw new ApiError('VALIDATION_ERROR', `incident ${incident_id} has no assigned contact to notify`);
-    const briefing = await generateBriefing(incident_id, channel === 'SMS' ? 'sms' : 'operator');
+    const briefing = prepared ?? (await generateBriefing(incident_id, channel === 'SMS' ? 'sms' : 'operator'));
 
     // A failed send must leave the incident where it was (ANALYZED stays
     // ANALYZED) but still shows up on the timeline.
@@ -137,7 +149,11 @@ export function createActions({ store, ports, newId, log = () => {} }: ActionDep
   // The Fetch agent's sequence. Each step leaves an Action row so the
   // dashboard timeline shows the agent working.
   async function handleHighestPriority(actor: Actor): Promise<HandleResult> {
-    const top = openIncidents(store).find(incident => UNACKNOWLEDGED_STATUSES.includes(incident.status));
+    // Incidents nobody has been alerted about come first. When every
+    // unacknowledged incident is already ALERT_SENT, the run reports on the
+    // most urgent one without sending again.
+    const unacknowledged = openIncidents(store).filter(incident => UNACKNOWLEDGED_STATUSES.includes(incident.status));
+    const top = unacknowledged.find(incident => incident.status !== 'ALERT_SENT') ?? unacknowledged[0];
     if (!top) throw new ApiError('NO_OPEN_INCIDENTS', 'there are no unacknowledged incidents to handle');
     const incident_id = top.incident_id;
     const steps: HandleStep[] = [];
@@ -159,10 +175,29 @@ export function createActions({ store, ports, newId, log = () => {} }: ActionDep
     const briefing = await generateBriefing(incident_id, 'sms');
     await step('generate_briefing', true, `sms briefing from ${briefing.source}`);
 
+    if (top.status === 'ALERT_SENT') {
+      const sent = store
+        .alerts()
+        .filter(a => a.incident_id === incident_id && a.delivery_status !== 'FAILED')
+        .sort((a, b) => a.sent_at.localeCompare(b.sent_at))
+        .at(-1);
+      const existing = sent ? { alert_id: sent.alert_id, delivery_status: sent.delivery_status } : null;
+      await step(
+        'notify_operator',
+        true,
+        `already alerted${existing ? ` (alert ${existing.alert_id})` : ''}; awaiting acknowledgement, not sent again`
+      );
+      return { incident: incidentSummary(store, incident_id), steps, briefing, alert: existing };
+    }
+
     let alert: NotifyResult | null = null;
     try {
-      alert = await notifyOperator(incident_id, 'SMS', actor);
-      steps.push({ step: 'notify_operator', ok: true, detail: `alert ${alert.alert_id}: ${alert.delivery_status}` });
+      alert = await notifyOperator(incident_id, 'SMS', actor, briefing);
+      steps.push({
+        step: 'notify_operator',
+        ok: alert.delivery_status !== 'FAILED',
+        detail: `alert ${alert.alert_id}: ${alert.delivery_status}`,
+      });
     } catch (error) {
       // notifyOperator already logged the failure; the run still reports back.
       if (!(error instanceof ApiError) || error.code === 'NOT_FOUND') throw error;

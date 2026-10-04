@@ -158,7 +158,11 @@ export interface HandleResult {
   incident: IncidentSummary;
   steps: HandleStep[];
   briefing: Briefing | null;
-  /** null when notification failed; see the failed notify_operator step. */
+  /**
+   * The alert this run sent, or the earlier one when the incident was already
+   * ALERT_SENT (nothing is sent twice). null when the send failed; see the
+   * notify_operator step.
+   */
   alert: NotifyResult | null;
 }
 
