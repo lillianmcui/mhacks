@@ -190,12 +190,14 @@ DETECTED -> ANALYZED -> ALERT_SENT -> ACKNOWLEDGED -> INVESTIGATING -> RESOLVED
 | `acknowledge_incident` | `{ incident_id, contact_id, channel, then_status? }` | updated IncidentSummary | NOT_FOUND, INVALID_TRANSITION |
 | `set_incident_status` | `{ incident_id, status, actor, note? }` | updated IncidentSummary | NOT_FOUND, INVALID_TRANSITION |
 | `generate_briefing` | `{ incident_id, kind: "operator" \| "sms" \| "summary" }` | `{ text, source: GROK \| TEMPLATE }` | NOT_FOUND |
-| `notify_operator` | `{ incident_id, channel: SMS \| CALL }` | `{ alert_id, delivery_status }` | NOT_FOUND, UPSTREAM_UNAVAILABLE |
+| `notify_operator` | `{ incident_id, channel: SMS \| CALL }` | `{ alert_id, delivery_status }` | NOT_FOUND, UPSTREAM_UNAVAILABLE, INVALID_TRANSITION |
 | `record_action` | `{ incident_id, actor, action_name, detail }` | `{ action_id }` | NOT_FOUND |
 | `handle_highest_priority` | `{ actor }` | the orchestration result. **Addition (flagged)**: the same sequence as the Fetch agent, so the dashboard fallback button (Product Direction §14) and Fetch share one implementation | NO_OPEN_INCIDENTS |
 
 `generate_briefing` tries Grok first and falls back to the template. You only wire this together; Track C implements both adapters (§3.8).
 `notify_operator` calls Track C's Relay adapter, then `record_alert`.
+`notify_operator` sends only while the incident is unacknowledged (`ANALYZED` or `ALERT_SENT`); after that it returns `INVALID_TRANSITION` and sends nothing.
+`handle_highest_priority` handles the most urgent incident that has not been alerted yet. If every unacknowledged incident is already `ALERT_SENT`, it reports on the most urgent one and does not send again. A `FAILED` delivery is a failed `notify_operator` step.
 
 ### 3.7 Response envelope and errors
 

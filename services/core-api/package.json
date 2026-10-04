@@ -1,0 +1,36 @@
+{
+  "name": "@ch4se/core-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CH4SE Core API: the one implementation of every shared action (TRACK_BACKEND.md §3.6).",
+  "exports": {
+    "./config.ts": "./src/config.ts",
+    "./errors.ts": "./src/errors.ts",
+    "./fixtures.ts": "./src/fixtures.ts",
+    "./ingest.ts": "./src/ingest.ts",
+    "./store.ts": "./src/store.ts",
+    "./store-memory.ts": "./src/store-memory.ts",
+    "./store-stdb.ts": "./src/store-stdb.ts",
+    "./standins/match.ts": "./src/standins/match.ts",
+    "./ports.ts": "./src/ports.ts"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "stub": "CORE_API_MODE=stub tsx src/server.ts",
+    "test": "tsx --test test/*.test.ts",
+    "test:e2e": "CH4SE_E2E=1 tsx --test test/e2e.stdb.test.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@ch4se/contracts": "file:../../packages/contracts",
+    "@ch4se/rules": "file:../../packages/rules",
+    "@ch4se/stdb-bindings": "file:../../packages/stdb-bindings",
+    "tsx": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.0"
+  }
+}

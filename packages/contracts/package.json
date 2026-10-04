@@ -1,0 +1,23 @@
+{
+  "name": "@ch4se/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CH4SE shared contracts: enums, table row types, action I/O types, adapter interfaces, display formatters.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./enums.ts": "./src/enums.ts",
+    "./tables.ts": "./src/tables.ts",
+    "./actions.ts": "./src/actions.ts",
+    "./adapters.ts": "./src/adapters.ts",
+    "./format.ts": "./src/format.ts"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.0"
+  }
+}

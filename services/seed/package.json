@@ -1,0 +1,21 @@
+{
+  "name": "@ch4se/seed",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CH4SE seed loader: fixtures -> reducers, plus the replay-event command.",
+  "scripts": {
+    "seed": "tsx src/cli.ts seed",
+    "replay": "tsx src/cli.ts replay",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@ch4se/contracts": "file:../../packages/contracts",
+    "@ch4se/core-api": "file:../core-api",
+    "tsx": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.0"
+  }
+}
