@@ -31,6 +31,8 @@ load_dotenv()
 
 SEED = os.environ.get("FETCH_AGENT_SEED", "ch4se-fetch-demo-seed")
 PORT = int(os.environ.get("FETCH_AGENT_PORT", "8000"))
+# Published to the agent's Agentverse profile when its mailbox is connected.
+README = os.path.join(os.path.dirname(os.path.abspath(__file__)), "AGENTVERSE_README.md")
 
 agent = Agent(
     name="ch4se-response",
@@ -41,6 +43,7 @@ agent = Agent(
         "CH4SE methane incident response agent. Ask whether there are unresolved "
         "methane incidents, or tell it to handle the highest priority one."
     ),
+    readme_path=README,
     publish_agent_details=True,
 )
 protocol = Protocol(spec=chat_protocol_spec)
