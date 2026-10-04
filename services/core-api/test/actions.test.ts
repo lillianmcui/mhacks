@@ -96,6 +96,40 @@ test('generate_briefing: a template that throws falls back to the stand-in', asy
   assert.equal((await actions.handle_highest_priority({ actor: 'FETCH_AGENT' })).incident.status, 'ALERT_SENT');
 });
 
+test('generate_briefing: a Grok briefing is reused until the incident changes; a failure is retried', async () => {
+  let calls = 0;
+  const { actions } = await setup({ grok: async () => ({ text: `grok #${++calls}` }) });
+  const first = await actions.generate_briefing({ incident_id: ID, kind: 'operator' });
+  const again = await actions.generate_briefing({ incident_id: ID, kind: 'operator' });
+  assert.deepEqual(again, first);
+  assert.equal(calls, 1, 'same incident state: no second Grok call');
+
+  await actions.generate_briefing({ incident_id: ID, kind: 'sms' });
+  assert.equal(calls, 2, 'a different kind is its own briefing');
+
+  const [a, b] = await Promise.all([
+    actions.generate_briefing({ incident_id: ID, kind: 'summary' }),
+    actions.generate_briefing({ incident_id: ID, kind: 'summary' }),
+  ]);
+  assert.deepEqual(a, b);
+  assert.equal(calls, 3, 'two requests at once share one Grok call');
+
+  await actions.acknowledge_incident({ incident_id: ID, contact_id: 'SAMPLE-C1', channel: 'DASHBOARD' });
+  const afterAck = await actions.generate_briefing({ incident_id: ID, kind: 'operator' });
+  assert.equal(calls, 4, 'the status changed, so the briefing is rewritten');
+  assert.notEqual(afterAck.text, first.text);
+
+  let attempts = 0;
+  const flaky = await setup({
+    grok: async () => {
+      if (++attempts === 1) throw new Error('timeout');
+      return { text: 'recovered' };
+    },
+  });
+  assert.equal((await flaky.actions.generate_briefing({ incident_id: ID, kind: 'sms' })).source, 'TEMPLATE');
+  assert.deepEqual(await flaky.actions.generate_briefing({ incident_id: ID, kind: 'sms' }), { text: 'recovered', source: 'GROK' });
+});
+
 test('the briefing input never includes a phone number', async () => {
   let seen = '';
   const { actions } = await setup({

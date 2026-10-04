@@ -15,6 +15,7 @@ import {
   type ActionOutput,
   type Actor,
   type Briefing,
+  type BriefingInput,
   type BriefingKind,
   type HandleResult,
   type HandleStep,
@@ -82,17 +83,37 @@ const NOTIFY_CHANNELS = ['SMS', 'CALL'] as const;
 export function createActions({ store, ports, newId, log = () => {} }: ActionDeps): Actions {
   const id = newId ?? (() => randomUUID().replaceAll('-', '').slice(0, 12));
 
+  // Grok briefings, kept while nothing they describe has changed. A briefing
+  // takes seconds to write, and without this every page load asked for a new
+  // one with different wording. Holding the promise also makes two requests
+  // that arrive together share one Grok call. Template text is never kept, so
+  // a Grok failure is retried on the next request.
+  const grokBriefings = new Map<string, { facts: string; briefing: Promise<Briefing | null> }>();
+
+  async function grokBriefing(incident_id: string, kind: BriefingKind, input: BriefingInput): Promise<Briefing | null> {
+    if (!ports.grokBriefing) return null;
+    try {
+      const { text: grokText } = await ports.grokBriefing(input, kind);
+      if (typeof grokText === 'string' && grokText.trim() !== '') return { text: grokText, source: 'GROK' };
+      log(`grok returned empty text for ${incident_id}; using template`);
+    } catch (error) {
+      log(`grok failed for ${incident_id} (${error instanceof Error ? error.message : String(error)}); using template`);
+    }
+    return null;
+  }
+
   async function generateBriefing(incident_id: string, kind: BriefingKind): Promise<Briefing> {
     const input = briefingInput(store, incident_id);
-    if (ports.grokBriefing) {
-      try {
-        const { text: grokText } = await ports.grokBriefing(input, kind);
-        if (typeof grokText === 'string' && grokText.trim() !== '') return { text: grokText, source: 'GROK' };
-        log(`grok returned empty text for ${incident_id}; using template`);
-      } catch (error) {
-        log(`grok failed for ${incident_id} (${error instanceof Error ? error.message : String(error)}); using template`);
-      }
+    const key = `${incident_id}:${kind}`;
+    const facts = JSON.stringify(input);
+    let entry = grokBriefings.get(key);
+    if (!entry || entry.facts !== facts) {
+      entry = { facts, briefing: grokBriefing(incident_id, kind, input) };
+      grokBriefings.set(key, entry);
     }
+    const fromGrok = await entry.briefing;
+    if (fromGrok) return fromGrok;
+    if (grokBriefings.get(key) === entry) grokBriefings.delete(key);
     // The template is the last resort; if it throws, the stand-in still says
     // something true rather than failing the alert.
     try {

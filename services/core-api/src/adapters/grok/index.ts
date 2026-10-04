@@ -2,6 +2,9 @@ import type { BriefingInput, BriefingKind } from "../../briefing/types.ts";
 import { assertNumbersGroundedInInput } from "./numberCheck.ts";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+// A non-reasoning model: briefings only restate given strings, and a reasoning
+// model (grok-4.7 was tried) does not answer inside the timeout.
+const DEFAULT_MODEL = "grok-4.20-0309-non-reasoning";
 
 const PLAIN_TEXT_RULES = [
   "Output plain text only: no markdown, no asterisks, no #, no backticks, no bold or italics.",
@@ -93,7 +96,7 @@ export async function grokBriefing(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.GROK_MODEL ?? "grok-3",
+        model: process.env.GROK_MODEL || DEFAULT_MODEL,
         temperature: 0.2,
         messages: [
           { role: "system", content: system },
