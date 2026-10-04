@@ -29,6 +29,7 @@ export async function grokBriefing(
     "You write operator briefings for methane incident response.",
     "Use ONLY facts from the JSON input.",
     "Quote every emission, uncertainty, timestamp, persistence, count, and distance using the exact display strings provided under display.*.",
+    "Never rewrite dates in prose (do not turn 2026-08-13 into August 13). Copy display.scene_timestamp and display.provenance verbatim.",
     "Never compute or infer new numbers.",
     'Say "associated asset" or "nearest registered asset", never "caused by".',
     "When display.replay_notice is present, include that this is a replayed historical observation.",

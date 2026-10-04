@@ -1,7 +1,6 @@
 /**
- * BriefingInput shape frozen in packages/contracts/src/adapters.ts (TRACK_BACKEND §3.8).
- * Keep this file in sync with contracts — do not invent alternate fields.
- * Until contracts is on this branch, the type is duplicated here for local tests.
+ * Temporary local mirror of packages/contracts BriefingInput for offline tests.
+ * After merging backend: delete this shape and `import type { BriefingInput, BriefingKind } from '@ch4se/contracts'`.
  */
 export type BriefingKind = "operator" | "sms" | "summary";
 
@@ -67,7 +66,7 @@ export interface BriefingInput {
   history: {
     source: {
       source_name: string;
-      persistence: string | null;
+      persistence: number | null;
       emission_auto: number | null;
       emission_uncertainty_auto: number | null;
       observation_dates: string[];

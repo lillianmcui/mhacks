@@ -1,4 +1,7 @@
-/** Every numeric token in model output must appear in the serialized input JSON. */
+/** Every numeric token in model output must appear in the serialized input JSON.
+ * Fail-safe: Core API catches throws and falls back to TEMPLATE.
+ * Prefer quoting display.* strings so rewritten dates (e.g. "August 13") do not appear.
+ */
 
 const NUMBER_RE = /-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi;
 
