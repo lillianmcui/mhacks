@@ -1,0 +1,48 @@
+{
+  "id": "8f1652f3-d850-4433-89e1-d5c991369395",
+  "plume_id": "tan20260813t190401c96s4001-B",
+  "gas": "CH4",
+  "geometry_json": {
+    "type": "Point",
+    "coordinates": [
+      -103.85762362224578,
+      31.873389751344106
+    ]
+  },
+  "scene_id": "34f51531-e2dd-44f5-9eb7-96343ebb27ea",
+  "scene_timestamp": "2026-08-13T19:04:01.960000Z",
+  "instrument": "tan",
+  "mission_phase": "production",
+  "platform": "Tanager",
+  "emission_auto": 1992.8883749063725,
+  "emission_uncertainty_auto": 521.0401467893507,
+  "emission_cmf_type": "mfa",
+  "gsd": null,
+  "sensitivity_mode": null,
+  "off_nadir": null,
+  "plume_png": "https://catalog.carbonmapper.org/l3a-vis-ch4-mfa-v3e/2026/08/13/tan20260813t190401c96s4001-B/tan20260813t190401c96s4001-B_l3a-vis-ch4-mfa-v3e_plume.png?c=111457d22c93a00cd7f2f428cabedcf843da23c7624f&Expires=1791126534&Signature=WXAu3vDaR-~KgQrh1UFgd65QHpv7RMhZKSy7tMrputdWOGOZpOkK2veMrUx9RsVunND4dbdkWGYbieVLW7AGj6NWv3IXoLOjMUEpd2f1n~HLRn9zpktDFthepMn5R-XehPtEPAfTePe8F8fjR~vxCLDdrjR3rscv4wiL5pb0vPh~98GSX43ty8y280o0-qdkZMUbqgGmEs0CTKpbD80zKNBzvc17dhhaLKcPvSC7tgkyYxNRGaFJF0hmNfTM2L6g~vUF4I1QLRjIKecoMRiVVRObNK20T~fXgEGY~wryLxeLRz5xpQArs0umn4fHJthgwROfoNu1vUDxeYqppbtIbA__&Key-Pair-Id=K1ZO5DZQBTMNGZ",
+  "plume_rgb_png": "https://catalog.carbonmapper.org/l3a-vis-ch4-mfa-v3e/2026/08/13/tan20260813t190401c96s4001-B/tan20260813t190401c96s4001-B_l3a-vis-ch4-mfa-v3e_plume-rgb.png?c=11147a6e7856a543e560bb5842f09765cba0cfd2618c&Expires=1791126534&Signature=bYYH78SDB6B-9sZoOTBZiBF3n0w-FvrkQ-~gIrYc7VRQmLOCoirklYSz3v0u0-X2~zkrDAJBpaYL4ZDvs0lewcQJUQrfmArj3I2jtmj5cp-IJhll68tpwruWCC7zyxuOnFZoD2MH3W2hUz~SvcVit5pntiN9rdp4-oRe1frU3Tqc21flUv3p3H9xPVu80L5g2or3i2e2mZyXF7WDIND3avZF8qRnakP~rye8WrTVrwnRwOrO2iCY5uoD59w2HWM~cHPsNlLxrdzu7wpbxzyOOJ71OtruCjGeKwZhA~zG~xox1v0mZTjfoBgX3MTRRTRSWB8175Flh~PHoCRglVSo4Q__&Key-Pair-Id=K1ZO5DZQBTMNGZ",
+  "plume_tif": "https://catalog.carbonmapper.org/l3a-vis-ch4-mfa-v3e/2026/08/13/tan20260813t190401c96s4001-B/tan20260813t190401c96s4001-B_l3a-vis-ch4-mfa-v3e_plume.tif?c=111470a57fe4126cd0da511728520301bdb92b010549&Expires=1791126534&Signature=Hwd0ej2wJUdl~oCRvl44Aag~K87tjIV5QBQyn~BB80jBbsbWgLYo1pg~sCm43CK7UDyGXRE4al9urcAFjwp-bwddOEYR12vETdwaqws19gPj1lUJHNPW0CHKS1e6EB6OoAP1KPIxb06ftKqaYl0YbA44ax1bMxfZlcBiEfJf5BIUFuc-0bFl-IFRDEogukOr~-NodjD9ULPIc~IzGlH98DtVqkVHDJKNx8a1ipi7P2a~F3FBIpVHR3qav-FORC-LzqrIG-H9fb2ZNeTdgTILwrwb88i7NFp7FjZB4dfBIzgZzCF5ccPHUQbW4lQk3Pp6BJDQjma0MeeYl5BQB5mXwQ__&Key-Pair-Id=K1ZO5DZQBTMNGZ",
+  "con_tif": "https://catalog.carbonmapper.org/l3a-ime-ch4-mfa-v3e/2026/08/13/tan20260813t190401c96s4001-B/tan20260813t190401c96s4001-B_l3a-ime-ch4-mfa-v3e_ime-cmf-concentrations.tif?c=11145f385ca795f19c3f50f5d0dcbfbb9ad3b7622a0b&Expires=1791126534&Signature=ZPlyFdRXPoO52OzljERLybgr057PZvbFYPvrvxePeWGXtPs14X6t1ItkLF3VWAU0~KFlNgryUE7XLvI-NX1FvE0x2siqJzOCwnV9tsaNpCAWQ39k-X-Wtany1J8iMWalrThUtbqVKMCiRRAd~BldOeWXfDjRAtwtFyNwEvObvuu6w2dbwr2ioVn~pgkEvhNigJGVFbSmUFfaPPanAQDbtmXcqshrKUQ1gewRbu7uU8AvitCgHfd7lznrFK5TtyAij6oRmBCwXYt~lrVNet0ktLeoelsdWKufz5AMl9XhbKhG31NWJ3Dm~oiSdXwSpu5U0QHzUieqeDR7jRqK48TfBg__&Key-Pair-Id=K1ZO5DZQBTMNGZ",
+  "rgb_png": "https://catalog.carbonmapper.org/l3a-vis-ch4-mfa-v3e/2026/08/13/tan20260813t190401c96s4001-B/tan20260813t190401c96s4001-B_l3a-vis-ch4-mfa-v3e_rgb.png?c=1114c601e460828e68d21b54e0494c8e2a91353a453c&Expires=1791126534&Signature=l-xYAdgu3ArrHFH~zqMMKaLNE9Zimkf8DGRkWnRPrbGZVG3-ETLV57Q5HOJvxh1h49DRaAfR6KJQ5zM3uMgxmQIJw4O9tEHEUP6beaQsZ-GmL2ZQQWPFt0reMpt6oMR~thqvW~GqaWAe164x4kqjyy1JK2l75M6pe8vt2kw9tWQ7CGdjQc7fFc1W8pUDGJ9S~ggLfET8ye-VV2z6YoZ-TJXMLMkWT2aI4ZZUEJgJzBoCDodGoGrUfs~YEZO7OsaWEDXpKzx~VmzTPrt5473c9eDOOHCWuPLLrtdtf8StSJVeyrQIbhu55JblaKvbMpCjiID3jaViq0BfWTyu3LJY0w__&Key-Pair-Id=K1ZO5DZQBTMNGZ",
+  "plume_bounds": [
+    -103.8652572531761,
+    31.85655281639991,
+    -103.82138476816148,
+    31.89380935199742
+  ],
+  "plume_quality": null,
+  "wind_speed_avg_auto": 4.302034854888916,
+  "wind_direction_avg_auto": 209.8711395263672,
+  "emission_version": "v3e",
+  "processing_software": "3.99.0",
+  "publication_sources": [],
+  "is_offshore": false,
+  "collection": "l2c-ch4-v0",
+  "cmf_type": "mfa",
+  "sector": "1B2",
+  "status": "published",
+  "hide_emission": false,
+  "published_at": "2026-09-12T19:19:16.523266Z",
+  "modified": "2026-09-12T19:19:16.521610Z"
+}
