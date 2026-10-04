@@ -31,16 +31,26 @@ function oneDecimal(value: number): string {
   return value.toFixed(1);
 }
 
+// Provider timestamps are UTC. A date-time with no offset would otherwise be
+// read in the machine's local zone, so the output would depend on where the
+// Core API runs.
+const NO_OFFSET = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)$/;
+
+function parseUtc(value: string): Date {
+  const match = NO_OFFSET.exec(value.trim());
+  return new Date(match ? `${match[1]}T${match[2]}Z` : value);
+}
+
 /** "2026-08-13 19:04 UTC". Unparseable input is returned unchanged. */
 export function formatTimestamp(iso: string): string {
-  const date = new Date(iso);
+  const date = parseUtc(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return `${date.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 }
 
 /** "2026-08-13" from a date or timestamp string. */
 export function formatDate(iso: string): string {
-  const date = new Date(iso);
+  const date = parseUtc(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toISOString().slice(0, 10);
 }

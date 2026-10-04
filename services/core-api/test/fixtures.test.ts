@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { SAMPLE_FIXTURES_DIR } from '../src/config.ts';
 import { FixtureError, loadCompanyFixtures, loadEventFixtures } from '../src/fixtures.ts';
-import { seedCompany } from '../src/ingest.ts';
+import { seedCompany, validateCompany } from '../src/ingest.ts';
 import { createMemoryStore } from '../src/store-memory.ts';
 import { codeOf } from './helpers.ts';
 
@@ -53,6 +53,15 @@ test('null uncertainty and wind stay null', () => {
   assert.equal(event.emission_uncertainty_auto, null);
   assert.equal(event.wind_speed_avg_auto, null);
   rmSync(dir, { recursive: true });
+});
+
+test('seeding rejects a policy that routes to a role no contact holds', async () => {
+  const company = loadCompanyFixtures(SAMPLE_FIXTURES_DIR);
+  company.policies[0]!.no_asset_route_role = 'nobody';
+  assert.deepEqual(validateCompany(company), ['policy SAMPLE-POL-1: no contact has the role nobody']);
+  const store = createMemoryStore();
+  assert.equal(await codeOf(seedCompany(store, company)), 'VALIDATION_ERROR');
+  assert.equal(store.policies().length, 0);
 });
 
 test('seeding rejects a company whose references or policies are broken', async () => {

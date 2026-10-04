@@ -37,6 +37,18 @@ export function validateCompany({ assets, contacts, policies }: CompanyFixtures)
       problems.push(`asset ${asset.asset_id}: policy_id ${asset.policy_id} is not a policy`);
     }
   }
+  // A role nobody holds would leave an incident with no one to notify.
+  const roles = new Set(contacts.map(c => c.role));
+  for (const policy of policies) {
+    const routed = [
+      ...(Array.isArray(policy.rules) ? policy.rules.map(rule => rule.notify_role) : []),
+      policy.ambiguous_route_role,
+      policy.no_asset_route_role,
+    ];
+    for (const role of new Set(routed)) {
+      if (role && !roles.has(role)) problems.push(`policy ${policy.policy_id}: no contact has the role ${role}`);
+    }
+  }
   if (policies.length === 0) problems.push('at least one escalation policy is required');
   return problems;
 }

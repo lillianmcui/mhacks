@@ -83,6 +83,19 @@ test('generate_briefing: Grok text is used, a Grok failure falls back to TEMPLAT
   assert.equal(await codeOf(bad.actions.generate_briefing({ incident_id: ID, kind: 'poem' })), 'VALIDATION_ERROR');
 });
 
+test('generate_briefing: a template that throws falls back to the stand-in', async () => {
+  const { store } = await setup();
+  const broken = ports();
+  broken.renderTemplateBriefing = () => {
+    throw new Error('template bug');
+  };
+  const actions = createActions({ store, ports: broken });
+  const briefing = await actions.generate_briefing({ incident_id: ID, kind: 'sms' });
+  assert.equal(briefing.source, 'TEMPLATE');
+  assert.match(briefing.text, /432 ± 99 kg CH4\/hr/);
+  assert.equal((await actions.handle_highest_priority({ actor: 'FETCH_AGENT' })).incident.status, 'ALERT_SENT');
+});
+
 test('the briefing input never includes a phone number', async () => {
   let seen = '';
   const { actions } = await setup({
