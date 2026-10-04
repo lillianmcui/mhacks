@@ -4,38 +4,49 @@
 
 ## Env
 
-- Webhook process: `agents/relay/.env` — `CORE_API_BASE` + `CORE_API_TOKEN`.
-- Outbound Relay/Grok keys: **repo-root** `.env` only (`RELAY_API_KEY`, `RELAY_API_BASE`, …). `services/core-api/.env` is not loaded.
+- Webhook / inbound process: `agents/relay/.env` — `CORE_API_BASE` + `CORE_API_TOKEN`.
+- Outbound Relay/Grok keys: **repo-root** `.env` only (`RELAY_API_KEY`, `RELAY_API_BASE`, …).
 
-## Capability checklist (verify in first hour — do not assume)
+## What Relay actually is (verified)
+
+Relay is a **messenger for agents**, not Twilio-style PSTN SMS to arbitrary numbers.
+
+| Direction | How |
+|-----------|-----|
+| **Outbound alert** | Core API `notify_operator` → `relaySend` → `POST /v1/chats` to a Relay **handle** (demo: agent owner `bennett`) |
+| **Inbound operator reply** | Operator texts the agent in the Relay app → your process gets `message.received` over **WebSocket** (`/v1/websocket`) or a signed **webhook** → you call Core API tools → reply with `POST /v1/chats/{chatId}/messages` |
+
+So yes: the agent **can** answer follow-ups (“how bad?”, “acknowledge”) if we run an inbound loop. That is separate from the one-shot alert.
+
+## Demo inbound loop (P1 path)
+
+1. Keep Core API live (`make api`).
+2. Run an inbound worker that:
+   - connects with the agent token,
+   - on `message.received`, maps text → Core API actions (`get_evidence`, `acknowledge_incident`, …),
+   - replies in the same `chat_id` with a short grounded answer (quote `display.*` strings).
+3. Scripted questions stay in `prompts/system.md` / `scripted_qa.md`.
+
+Outbound alerts already work. Inbound conversational orchestration is the next Relay slice.
+
+## Response playbook (synthetic)
+
+`data/fixtures/company/response_playbook.json` lists demo crews/equipment and match-result scripts. SMS “Do now” steps are deterministic in the template today; wiring playbook resources into Core API actions is a follow-up.
+
+## Capability checklist
 
 | Question | Verified? | Notes |
 |----------|-----------|-------|
-| Inbound SMS to agent? | ☐ | |
-| Outbound SMS from API? | ☐ | via `services/core-api/src/adapters/relay/` |
-| Voice calls? | ☐ | P1 for demo |
-| Webhooks for inbound? | ☐ | |
-| Trial / rate limits? | ☐ | |
-| Demo recipient phone | ☐ | teammate number only |
-
-## Architecture
-
-```
-Outbound: Fetch / dashboard -> Core API notify_operator -> relay adapter -> Relay -> phone
-Inbound:  SMS/call -> Relay agent -> tools -> Core API -> SpacetimeDB -> dashboard
-```
-
-Tools map 1:1 to Core API actions (no Relay-specific writes).
-
-## Grounding (put in Relay system prompt)
-
-See `prompts/system.md`.
+| Outbound alert to Relay chat? | ✅ | CreateChat + `text.value` parts; `DELIVERED` |
+| Inbound operator messages? | ☐ | Need websocket/webhook worker |
+| Voice calls? | ☐ | P1 (`calls_enabled` on agent) |
+| Demo recipient | ✅ | Agent owner handle (not E.164) |
 
 ## Local webhook stub
 
 ```bash
-pip install fastapi uvicorn httpx python-dotenv
+pip install -r requirements.txt
 uvicorn webhook:app --reload --port 8790
 ```
 
-Point Relay inbound webhook at your tunnel URL + `/relay/inbound`.
+For production-shaped inbound, prefer Relay WebSocket per https://docs.relayapp.im/llms.txt.
