@@ -57,6 +57,13 @@ def open_incidents() -> list[dict]:
             "priority_display": "HIGH",
             "status": "ANALYZED",
             "match_result": "MATCHED",
+            "is_replay": True,
+            "display": {
+                "headline": "HIGH — UNACKNOWLEDGED",
+                "asset": "Associated asset: TX-184 compressor_station (42 m from plume origin)",
+                "emission": "STUB_EMISSION_DISPLAY",
+                "provenance": "Stub provider · STUB_TIMESTAMP",
+            },
         }
     ]
 
@@ -70,16 +77,36 @@ def dispatch(action: str, body: dict[str, Any]) -> dict:
         iid = body.get("incident_id")
         if iid != INCIDENT_ID:
             return err("NOT_FOUND", f"incident {iid}")
+        # Nested IncidentDetail shape (matches packages/contracts).
         return ok(
             {
-                "incident_id": INCIDENT_ID,
-                "asset_id": ASSET_ID,
-                "facility_type": "compressor_station",
-                "priority": "HIGH",
+                "incident": {
+                    "incident_id": INCIDENT_ID,
+                    "asset_id": ASSET_ID,
+                    "priority": "HIGH",
+                    "status": "ANALYZED",
+                    "match_result": "MATCHED",
+                    "assigned_contact_id": CONTACT_ID,
+                },
+                "event": {},
+                "asset": {
+                    "asset_id": ASSET_ID,
+                    "facility_type": "compressor_station",
+                },
+                "candidates": [],
+                "assigned_contact": {
+                    "contact_id": CONTACT_ID,
+                    "name": "Ops Lead (teammate)",
+                    "role": "site_manager",
+                },
                 "status": "ANALYZED",
-                "match_result": "MATCHED",
-                "distance_m": 42.0,
-                "assigned_contact_id": CONTACT_ID,
+                "display": {
+                    "headline": "HIGH — UNACKNOWLEDGED",
+                    "asset": "Associated asset: TX-184 compressor_station (42 m from plume origin)",
+                    "emission": "STUB_EMISSION_DISPLAY",
+                    "provenance": "Stub provider · STUB_TIMESTAMP",
+                    "replay_notice": "This is a replayed historical observation.",
+                },
             }
         )
 
@@ -132,9 +159,25 @@ def dispatch(action: str, body: dict[str, Any]) -> dict:
         # Simulate backend not implementing this yet so Fetch exercises local sequence.
         return err("NOT_FOUND", "handle_highest_priority not implemented in mock")
 
+    if action == "get_evidence":
+        if body.get("incident_id") != INCIDENT_ID:
+            return err("NOT_FOUND", "incident")
+        return ok(
+            {
+                "incident_id": INCIDENT_ID,
+                "is_replay": True,
+                "display": {
+                    "emission": "STUB_EMISSION_DISPLAY",
+                    "provenance": "Stub provider · STUB_TIMESTAMP",
+                    "replay_notice": "This is a replayed historical observation.",
+                },
+            }
+        )
+
+    if action == "get_asset_history":
+        return ok({"incident_id": body.get("incident_id"), "source": None, "previous_incidents": []})
+
     if action in (
-        "get_evidence",
-        "get_asset_history",
         "acknowledge_incident",
         "set_incident_status",
     ):

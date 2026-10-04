@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Run Fetch agent phrases against Core API without uAgents (local mock or real stub)."""
+"""Run Fetch agent phrases against Core API without uAgents (local mock or real)."""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 import sys
 
@@ -15,13 +16,18 @@ from orchestrate import handle_user_request
 load_dotenv()
 
 
+async def _run(message: str) -> str:
+    async with HttpCoreApi() as api:
+        return await handle_user_request(api, message)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="CH4SE Fetch CLI (Core API only)")
     parser.add_argument(
         "message",
         nargs="?",
         default="Do we have any unresolved methane incidents?",
-        help="Operator / ASI-style phrase",
+        help="Manager / ASI:One-style phrase",
     )
     args = parser.parse_args()
 
@@ -32,8 +38,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    api = HttpCoreApi()
-    print(handle_user_request(api, args.message))
+    print(asyncio.run(_run(args.message)))
 
 
 if __name__ == "__main__":
