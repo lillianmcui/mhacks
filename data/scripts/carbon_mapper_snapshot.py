@@ -83,6 +83,11 @@ def pick_plume(source: dict, plume_name: str) -> dict | None:
 def plume_lat_lon(plume: dict) -> tuple[float, float] | None:
     lat = plume.get("plume_latitude", plume.get("latitude"))
     lon = plume.get("plume_longitude", plume.get("longitude"))
+    # The catalog API gives the origin as a GeoJSON Point: [longitude, latitude].
+    geometry = plume.get("geometry_json") or {}
+    coords = geometry.get("coordinates") if isinstance(geometry, dict) else None
+    if (lat is None or lon is None) and geometry.get("type") == "Point" and coords and len(coords) >= 2:
+        lon, lat = coords[0], coords[1]
     if lat is None or lon is None:
         return None
     return float(lat), float(lon)

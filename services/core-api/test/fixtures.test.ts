@@ -37,6 +37,36 @@ test('CSV-style `datetime` is normalized to scene_timestamp', () => {
   rmSync(dir, { recursive: true });
 });
 
+test('the catalog API shapes load: geometry_json origin, `sector`, nested source summary', () => {
+  const dir = scratch(d => {
+    editJson(join(d, 'carbon_mapper/main/plume.json'), ({ plume_latitude, plume_longitude, ipcc_sector, ...plume }) => ({
+      ...plume,
+      geometry_json: { type: 'Point', coordinates: [plume_longitude, plume_latitude] },
+      sector: ipcc_sector,
+    }));
+    editJson(join(d, 'carbon_mapper/main/source.json'), ({ persistence, emission_auto, emission_uncertainty_auto, ...source }) => ({
+      ...source,
+      source: { gas: 'CH4', persistence, emission_auto, emission_uncertainty_auto },
+    }));
+  });
+  const sample = loadEventFixtures(SAMPLE_FIXTURES_DIR);
+  const api = loadEventFixtures(dir);
+  assert.deepEqual(api.event, sample.event);
+  assert.deepEqual(api.source, sample.source);
+  rmSync(dir, { recursive: true });
+});
+
+test('a plume with no origin in either shape is an error', () => {
+  const dir = scratch(d =>
+    editJson(join(d, 'carbon_mapper/main/plume.json'), ({ plume_latitude: _lat, ...plume }) => ({
+      ...plume,
+      geometry_json: { type: 'Point', coordinates: ['-103.8', null] },
+    }))
+  );
+  assert.throws(() => loadEventFixtures(dir), (error: unknown) => error instanceof FixtureError && /plume_latitude must be a number/.test(error.message));
+  rmSync(dir, { recursive: true });
+});
+
 test('a missing required number is an error, never a default', () => {
   const dir = scratch(d =>
     editJson(join(d, 'carbon_mapper/main/plume.json'), ({ emission_auto: _dropped, ...plume }) => plume)

@@ -90,9 +90,9 @@ export function formatHistory(source: Pick<ProviderSource, 'observation_dates' |
   return `detected on ${source.detection_dates.length} of ${source.observation_dates.length} observation dates since ${formatDate(first)}`;
 }
 
-/** "persistence 0.6 (Carbon Mapper)", or null when the provider gives none. */
+/** "persistence 0.41 (Carbon Mapper)" (two decimals at most), or null when the provider gives none. */
 export function formatPersistence(persistence: number | null): string | null {
-  return persistence === null ? null : `persistence ${String(persistence)} (Carbon Mapper)`;
+  return persistence === null ? null : `persistence ${String(Number(persistence.toFixed(2)))} (Carbon Mapper)`;
 }
 
 /** "4.2 m/s from 215° (HRRR)", or null when the provider gives no wind. */

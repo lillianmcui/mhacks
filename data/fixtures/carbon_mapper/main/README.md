@@ -1,16 +1,5 @@
-# MAIN event fixtures (pending snapshot)
+# Carbon Mapper snapshot: main
 
-Run after `CARBON_MAPPER_TOKEN` is in your local env:
-
-```bash
-python data/scripts/carbon_mapper_snapshot.py \
-  --plume tan20260813t190401c96s4001-B \
-  --out main
-```
-
-Then add:
-
-- `scenes.geojson` from `/catalog/download/scenes.geojson` (bbox around plume)
-- `plume_png` downloaded for offline demo
-
-Do **not** commit the API token. Values in JSON must come from the API only (no hand-typed emissions).
+- plume_id: `tan20260813t190401c96s4001-B`
+- source_name: `CH4_1B2_100m_-103.85748_31.87329`
+- All numeric fields come from the API response files in this folder. Do not hand-edit.
