@@ -6,6 +6,7 @@ import {
   ACTORS,
   ALERT_CHANNELS,
   BRIEFING_KINDS,
+  BRIEFING_SOURCES,
   INCIDENT_STATUSES,
   UNACKNOWLEDGED_STATUSES,
   isOneOf,
@@ -151,7 +152,12 @@ export function createActions({ store, ports, newId, log = () => {} }: ActionDep
       briefing_source: briefing.source,
       actor,
     });
-    return { alert_id, delivery_status: sent.delivery_status };
+    return {
+      alert_id,
+      delivery_status: sent.delivery_status,
+      message_text: briefing.text,
+      briefing_source: briefing.source,
+    };
   }
 
   // The Fetch agent's sequence. Each step leaves an Action row so the
@@ -287,7 +293,18 @@ export function createActions({ store, ports, newId, log = () => {} }: ActionDep
       const incident_id = text(body, 'incident_id');
       const channel = choice(body, 'channel', NOTIFY_CHANNELS);
       const actor = optional(body, 'actor', () => choice(body, 'actor', ACTORS)) ?? 'SYSTEM';
-      return notifyOperator(incident_id, channel, actor);
+      let prepared: Briefing | undefined;
+      const briefingField = body.briefing;
+      if (briefingField !== undefined && briefingField !== null) {
+        if (typeof briefingField !== 'object' || Array.isArray(briefingField)) {
+          throw new ApiError('VALIDATION_ERROR', 'briefing must be an object with text and source');
+        }
+        const b = briefingField as Fields;
+        const briefingText = text(b, 'text');
+        const source = choice(b, 'source', BRIEFING_SOURCES);
+        prepared = { text: briefingText, source };
+      }
+      return notifyOperator(incident_id, channel, actor, prepared);
     },
 
     async record_action(input) {

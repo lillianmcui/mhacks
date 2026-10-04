@@ -148,8 +148,26 @@ def dispatch(action: str, body: dict[str, Any]) -> dict:
     if action == "notify_operator":
         if body.get("incident_id") != INCIDENT_ID:
             return err("NOT_FOUND", "incident")
+        prepared = body.get("briefing") if isinstance(body.get("briefing"), dict) else None
+        text = (
+            prepared.get("text")
+            if isinstance(prepared, dict) and isinstance(prepared.get("text"), str)
+            else SMS_TEXT
+        )
+        source = (
+            prepared.get("source")
+            if isinstance(prepared, dict) and prepared.get("source") in ("GROK", "TEMPLATE")
+            else "TEMPLATE"
+        )
         # Contract DeliveryStatus: SENT | DELIVERED | FAILED
-        return ok({"alert_id": "alert-stub-001", "delivery_status": "SENT"})
+        return ok(
+            {
+                "alert_id": "alert-stub-001",
+                "delivery_status": "SENT",
+                "message_text": text,
+                "briefing_source": source,
+            }
+        )
 
     if action == "record_action":
         ACTIONS.append(body)

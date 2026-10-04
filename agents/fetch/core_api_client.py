@@ -115,24 +115,27 @@ class HttpCoreApi:
                 raise CoreApiError(
                     "UNKNOWN", f"non-JSON response HTTP {r.status_code}"
                 ) from e
-            if r.status_code == 429:
-                raise CoreApiError("UPSTREAM_UNAVAILABLE", f"HTTP 429: {payload}")
-            if r.status_code >= 500:
-                raise CoreApiError(
-                    "UPSTREAM_UNAVAILABLE", f"HTTP {r.status_code}: {payload}"
-                )
         finally:
             if owns_client:
                 await client.aclose()
 
-        if not isinstance(payload, dict) or not payload.get("ok"):
-            err = (payload or {}).get("error") if isinstance(payload, dict) else {}
-            err = err or {}
-            raise CoreApiError(
-                str(err.get("code", "UNKNOWN")),
-                str(err.get("message", payload)),
-            )
-        return payload.get("data")
+        if isinstance(payload, dict) and payload.get("ok"):
+            return payload.get("data")
+
+        err = (payload or {}).get("error") if isinstance(payload, dict) else {}
+        err = err if isinstance(err, dict) else {}
+        code = str(err.get("code") or "")
+        message = str(err.get("message") or "")
+        if not code:
+            if r.status_code == 429:
+                code = "UPSTREAM_UNAVAILABLE"
+            elif r.status_code >= 500:
+                code = "UPSTREAM_UNAVAILABLE"
+            else:
+                code = "UNKNOWN"
+        if not message:
+            message = f"HTTP {r.status_code}"
+        raise CoreApiError(code, message)
 
     async def get_open_incidents(self, limit: int = 10) -> list[dict]:
         data = await self._post("get_open_incidents", {"limit": limit})
@@ -166,13 +169,21 @@ class HttpCoreApi:
         )
 
     async def notify_operator(
-        self, incident_id: str, channel: str = "SMS", *, actor: str = "FETCH_AGENT"
+        self,
+        incident_id: str,
+        channel: str = "SMS",
+        *,
+        actor: str = "FETCH_AGENT",
+        briefing: dict[str, Any] | None = None,
     ) -> dict:
-        return await self._post(
-            "notify_operator",
-            {"incident_id": incident_id, "channel": channel, "actor": actor},
-            retries=0,
-        )
+        body: dict[str, Any] = {
+            "incident_id": incident_id,
+            "channel": channel,
+            "actor": actor,
+        }
+        if briefing is not None:
+            body["briefing"] = briefing
+        return await self._post("notify_operator", body, retries=0)
 
     async def record_action(
         self, incident_id: str, action_name: str, detail: str = ""

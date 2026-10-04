@@ -10,6 +10,7 @@ from intent import Intent, classify
 from orchestrate import (
     CoreApiError,
     handle_user_request,
+    pick_handle_candidate,
     summarize_open,
     unacknowledged,
 )
@@ -34,7 +35,13 @@ class FakeApi:
                 },
             }
         ]
-        self.notify_result = {"alert_id": "a1", "delivery_status": "DELIVERED"}
+        self._detail_status = "ANALYZED"
+        self.notify_result = {
+            "alert_id": "a1",
+            "delivery_status": "DELIVERED",
+            "message_text": "SMS stub for TX-184",
+            "briefing_source": "TEMPLATE",
+        }
         self.notify_error: CoreApiError | None = None
 
     async def get_open_incidents(self, limit: int = 10) -> list[dict]:
@@ -48,12 +55,18 @@ class FakeApi:
                 "incident_id": incident_id,
                 "asset_id": "TX-184",
                 "priority": "CRITICAL",
-                "status": "ANALYZED",
+                "status": self._detail_status,
+                "match_result": "MATCHED",
             },
-            "status": "ANALYZED",
+            "status": self._detail_status,
             "asset": {"asset_id": "TX-184", "facility_type": "compressor_station"},
             "assigned_contact": {"contact_id": "contact-ops-lead", "name": "Ops Lead"},
-            "display": self._open[0]["display"],
+            "display": self._open[0].get("display")
+            or {
+                "headline": f"{self._detail_status}",
+                "asset": "Associated asset: TX-184",
+                "emission": "1993 ± 521 kg CH4/hr (Carbon Mapper estimate)",
+            },
             "is_replay": True,
         }
 
@@ -74,7 +87,16 @@ class FakeApi:
 
     async def get_asset_history(self, incident_id: str) -> dict:
         self.calls.append(("get_asset_history", {"incident_id": incident_id}))
-        return {"incident_id": incident_id, "source": {}}
+        return {
+            "incident_id": incident_id,
+            "source": {},
+            "previous_incidents": [],
+            "display": {
+                "history": "provider source linked to TX-184",
+                "persistence": "persistence 0.75 (Carbon Mapper)",
+                "previous_incidents": "no previous CH4SE incidents",
+            },
+        }
 
     async def get_escalation_policy(
         self, *, incident_id: str | None = None, asset_id: str | None = None
@@ -93,17 +115,30 @@ class FakeApi:
         return {"text": "SMS stub for TX-184", "source": "TEMPLATE"}
 
     async def notify_operator(
-        self, incident_id: str, channel: str = "SMS", *, actor: str = "FETCH_AGENT"
+        self,
+        incident_id: str,
+        channel: str = "SMS",
+        *,
+        actor: str = "FETCH_AGENT",
+        briefing: dict[str, Any] | None = None,
     ) -> dict:
         self.calls.append(
             (
                 "notify_operator",
-                {"incident_id": incident_id, "channel": channel, "actor": actor},
+                {
+                    "incident_id": incident_id,
+                    "channel": channel,
+                    "actor": actor,
+                    "briefing": briefing,
+                },
             )
         )
         if self.notify_error:
             raise self.notify_error
-        return self.notify_result
+        out = dict(self.notify_result)
+        if briefing and briefing.get("text"):
+            out["message_text"] = briefing["text"]
+        return out
 
     async def record_action(
         self, incident_id: str, action_name: str, detail: str = ""
@@ -130,9 +165,19 @@ class IntentTests(unittest.TestCase):
         r = classify("walk me through what happens when you handle the top priority")
         self.assertEqual(r.intent, Intent.EXPLAIN)
 
-    def test_handle(self) -> None:
+    def test_handle_imperative(self) -> None:
         r = classify("Handle our highest-priority methane incident.")
         self.assertEqual(r.intent, Intent.HANDLE)
+
+    def test_handle_questions_are_not_notify(self) -> None:
+        cases = [
+            "Has INC-0001 been handled yet?",
+            "Who handles this incident?",
+            "Don't handle it yet, just tell me the status",
+        ]
+        for msg in cases:
+            with self.subTest(msg=msg):
+                self.assertEqual(classify(msg).intent, Intent.STATUS)
 
     def test_investigate_with_id(self) -> None:
         r = classify("Why is INC-0001 critical?")
@@ -145,6 +190,10 @@ class IntentTests(unittest.TestCase):
 
     def test_list(self) -> None:
         r = classify("Do we have any unresolved methane incidents?")
+        self.assertEqual(r.intent, Intent.LIST_OPEN)
+
+    def test_asset_question_is_list(self) -> None:
+        r = classify("Which asset is associated with the most urgent incident?")
         self.assertEqual(r.intent, Intent.LIST_OPEN)
 
 
@@ -179,11 +228,31 @@ class OrchestrateTests(unittest.TestCase):
         waiting = unacknowledged(rows)
         self.assertEqual([w["incident_id"] for w in waiting], ["b"])
 
+    def test_pick_prefers_analyzed_over_alert_sent(self) -> None:
+        picked = pick_handle_candidate(
+            [
+                {"incident_id": "alerted", "status": "ALERT_SENT", "priority": "CRITICAL"},
+                {"incident_id": "fresh", "status": "ANALYZED", "priority": "HIGH"},
+            ]
+        )
+        assert picked is not None
+        self.assertEqual(picked["incident_id"], "fresh")
+
     def test_list_open(self) -> None:
         api = FakeApi()
         reply = run(handle_user_request(api, "Do we have any unresolved methane incidents?"))
         self.assertIn("INC-0001", reply)
         self.assertIn("1993 ± 521", reply)
+
+    def test_asset_question_lists_incident(self) -> None:
+        api = FakeApi()
+        reply = run(
+            handle_user_request(
+                api, "Which asset is associated with the most urgent incident?"
+            )
+        )
+        self.assertIn("TX-184", reply)
+        self.assertNotIn("Try:", reply)
 
     def test_handle_orchestrates_tools_not_one_shot(self) -> None:
         api = FakeApi()
@@ -200,45 +269,80 @@ class OrchestrateTests(unittest.TestCase):
         self.assertNotIn("handle_highest_priority", names)
         notify = next(c for c in api.calls if c[0] == "notify_operator")
         self.assertEqual(notify[1].get("actor"), "FETCH_AGENT")
+        self.assertEqual(
+            notify[1].get("briefing"),
+            {"text": "SMS stub for TX-184", "source": "TEMPLATE"},
+        )
+        # Timeline records steps, but not a duplicate notify_operator action.
+        recorded = [c[1]["action_name"] for c in api.calls if c[0] == "record_action"]
+        self.assertIn("get_incident", recorded)
+        self.assertIn("get_asset", recorded)
+        self.assertIn("get_escalation_policy", recorded)
+        self.assertIn("generate_briefing", recorded)
+        self.assertNotIn("notify_operator", recorded)
         self.assertIn("Relay", reply)
-        self.assertIn("DELIVERED", reply)
-        self.assertIn("1993 ± 521", reply)
+        self.assertIn("Briefing sent through Relay:", reply)
+        self.assertIn("SMS stub for TX-184", reply)
 
-    def test_investigate_does_not_notify(self) -> None:
+    def test_repeat_handle_skips_second_send(self) -> None:
+        api = FakeApi()
+        api._open[0]["status"] = "ALERT_SENT"
+        api._detail_status = "ALERT_SENT"
+        reply = run(
+            handle_user_request(api, "Handle our highest-priority methane incident.")
+        )
+        names = [c[0] for c in api.calls]
+        self.assertNotIn("notify_operator", names)
+        self.assertNotIn("generate_briefing", names)
+        self.assertIn("already alerted", reply.lower())
+        self.assertIn("awaiting operator acknowledgement", reply.lower())
+        recorded = [c[1] for c in api.calls if c[0] == "record_action"]
+        self.assertTrue(
+            any(
+                r["action_name"] == "notify_operator"
+                and "not sent again" in r["detail"]
+                for r in recorded
+            )
+        )
+
+    def test_investigate_does_not_notify_and_uses_history(self) -> None:
         api = FakeApi()
         reply = run(handle_user_request(api, "Why is INC-0001 critical?"))
         names = [c[0] for c in api.calls]
         self.assertIn("get_evidence", names)
+        self.assertIn("get_asset_history", names)
         self.assertNotIn("notify_operator", names)
+        self.assertIn("persistence 0.75", reply)
+        self.assertIn("no previous CH4SE incidents", reply)
         self.assertIn("read-only", reply.lower())
+
+    def test_status_phrases_with_handle_do_not_notify(self) -> None:
+        api = FakeApi()
+        for msg in (
+            "Has INC-0001 been handled yet?",
+            "Who handles this incident?",
+            "Don't handle it yet, just tell me the status",
+        ):
+            api.calls.clear()
+            reply = run(handle_user_request(api, msg))
+            names = [c[0] for c in api.calls]
+            self.assertNotIn("notify_operator", names, msg)
+            self.assertIn("Status:", reply)
 
     def test_status_unacked(self) -> None:
         api = FakeApi()
-
-        async def alerted(incident_id: str) -> dict:
-            data = await FakeApi.get_incident(api, incident_id)
-            data["status"] = "ALERT_SENT"
-            data["incident"]["status"] = "ALERT_SENT"
-            return data
-
-        api.get_incident = alerted  # type: ignore[method-assign]
+        api._detail_status = "ALERT_SENT"
         reply = run(handle_user_request(api, "Has the operator acknowledged INC-0001?"))
         self.assertIn("Not yet", reply)
-        self.assertIn("awaiting operator acknowledgement", reply)
+        self.assertIn("awaiting acknowledgement", reply)
 
-    def test_status_acked(self) -> None:
+    def test_status_acked_does_not_claim_relay_only(self) -> None:
         api = FakeApi()
-
-        async def investigating(incident_id: str) -> dict:
-            data = await FakeApi.get_incident(api, incident_id)
-            data["status"] = "INVESTIGATING"
-            data["incident"]["status"] = "INVESTIGATING"
-            return data
-
-        api.get_incident = investigating  # type: ignore[method-assign]
+        api._detail_status = "INVESTIGATING"
         reply = run(handle_user_request(api, "Has the operator acknowledged it?"))
         self.assertIn("Yes", reply)
         self.assertIn("INVESTIGATING", reply)
+        self.assertIn("Relay or the dashboard", reply)
 
     def test_handle_skips_acknowledged_open_rows(self) -> None:
         api = FakeApi()
@@ -273,6 +377,7 @@ class OrchestrateTests(unittest.TestCase):
         reply = run(handle_user_request(api, "Handle our highest-priority methane incident."))
         self.assertIn("did not succeed", reply)
         self.assertIn("UPSTREAM_UNAVAILABLE", reply)
+        self.assertIn("not confirmed sent", reply.lower())
 
     def test_explain_never_calls_api(self) -> None:
         api = FakeApi()
@@ -283,6 +388,7 @@ class OrchestrateTests(unittest.TestCase):
             )
         )
         self.assertIn("Nothing is sent", reply)
+        self.assertIn("ALERT_SENT", reply)
         self.assertEqual(api.calls, [])
 
     def test_help(self) -> None:

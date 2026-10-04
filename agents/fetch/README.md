@@ -98,7 +98,7 @@ get_open_incidents → pick unacknowledged highest priority
 
 The agent reports ✓ / ✗ per step. It only claims Relay success when `delivery_status` is `SENT` or `DELIVERED`.
 
-**Side-effect safety:** investigate / list / status never call `notify_operator`. Only explicit handle / notify / start-response intents do.
+**Side-effect safety:** investigate / list / status never call `notify_operator`. Only explicit handle / notify / start-response intents do. A second handle on an already `ALERT_SENT` incident skips Relay and reports awaiting acknowledgement.
 
 ## Architecture
 

@@ -128,6 +128,27 @@ test('notify_operator: Relay throwing is UPSTREAM_UNAVAILABLE and the dashboard 
   assert.equal(store.actions().at(-1)?.actor, 'DASHBOARD');
 });
 
+
+test('notify_operator: prepared briefing is what Relay receives and returns', async () => {
+  const calls: { text: string }[] = [];
+  const { actions } = await setup({
+    relay: async input => {
+      calls.push({ text: input.text });
+      return { delivery_status: 'SENT', provider_ref: 'test' };
+    },
+  });
+  const prepared = { text: 'exact fetch briefing', source: 'TEMPLATE' as const };
+  const result = await actions.notify_operator({
+    incident_id: ID,
+    channel: 'SMS',
+    actor: 'FETCH_AGENT',
+    briefing: prepared,
+  });
+  assert.equal(result.message_text, 'exact fetch briefing');
+  assert.equal(result.briefing_source, 'TEMPLATE');
+  assert.equal(calls.at(-1)?.text, 'exact fetch briefing');
+});
+
 test('notify_operator: a FAILED delivery is recorded but does not move the status', async () => {
   const { actions, store } = await setup({ relay: async () => ({ delivery_status: 'FAILED', provider_ref: 'x' }) });
   const result = await actions.notify_operator({ incident_id: ID, channel: 'SMS' });

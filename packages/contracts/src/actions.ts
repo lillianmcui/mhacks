@@ -135,6 +135,9 @@ export interface Briefing {
 export interface NotifyResult {
   alert_id: string;
   delivery_status: DeliveryStatus;
+  /** Exact text that was handed to Relay (when a send occurred). */
+  message_text?: string;
+  briefing_source?: BriefingSource;
 }
 
 export const HANDLE_STEPS = [
@@ -187,7 +190,16 @@ export interface ActionIO {
     output: IncidentSummary;
   };
   generate_briefing: { input: { incident_id: string; kind: BriefingKind }; output: Briefing };
-  notify_operator: { input: { incident_id: string; channel: 'SMS' | 'CALL'; actor?: Actor }; output: NotifyResult };
+  notify_operator: {
+    input: {
+      incident_id: string;
+      channel: 'SMS' | 'CALL';
+      actor?: Actor;
+      /** When set, Relay gets this text instead of generating a second briefing. */
+      briefing?: Briefing;
+    };
+    output: NotifyResult;
+  };
   record_action: {
     input: { incident_id: string; actor: Actor; action_name: string; detail: string };
     output: { action_id: string };

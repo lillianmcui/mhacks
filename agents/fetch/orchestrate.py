@@ -8,6 +8,8 @@ from intent import Intent, RoutedIntent, classify
 
 # Unacknowledged = still waiting for operator ack (backend: ANALYZED | ALERT_SENT).
 UNACKNOWLEDGED = frozenset({"DETECTED", "ANALYZED", "ALERT_SENT"})
+# Prefer not-yet-alerted when choosing what to handle.
+NEEDS_FIRST_ALERT = frozenset({"DETECTED", "ANALYZED"})
 
 HELP = (
     "I am the CH4SE methane incident-response agent.\n\n"
@@ -21,14 +23,14 @@ HELP = (
 
 EXPLAIN = """Here is what I do when you ask me to handle an incident. Nothing is sent until you explicitly say handle / notify / start response.
 
-1. List open incidents and pick the highest-priority unacknowledged one (or the id you named).
+1. List open incidents and pick the highest-priority incident that still needs a first alert (ANALYZED), or the id you named.
 2. Load incident detail, evidence, asset, and escalation policy from the Core API.
 3. Generate a grounded operator briefing (numbers come from provider display strings).
-4. Request operator notification through Relay via notify_operator.
-5. Record each step on the incident timeline.
+4. Request operator notification through Relay via notify_operator, sending that same briefing text.
+5. Record each investigation step on the incident timeline (the alert itself is also recorded by Core API).
 6. Report delivery status and current incident state.
 
-Repeat handle on an already-alerted incident does not invent a second success — I report what Relay / Core API returns.
+If the incident is already ALERT_SENT, I do not send again — I report that it is awaiting operator acknowledgement.
 
 Say: 'Handle our highest-priority methane incident.' to run it."""
 
@@ -51,7 +53,12 @@ class CoreApi(Protocol):
     async def generate_briefing(self, incident_id: str, kind: str = "sms") -> dict: ...
 
     async def notify_operator(
-        self, incident_id: str, channel: str = "SMS", *, actor: str = "FETCH_AGENT"
+        self,
+        incident_id: str,
+        channel: str = "SMS",
+        *,
+        actor: str = "FETCH_AGENT",
+        briefing: dict[str, Any] | None = None,
     ) -> dict: ...
 
     async def record_action(
@@ -99,8 +106,27 @@ def _status_of(item: dict[str, Any]) -> str:
 
 def unacknowledged(incidents: list[dict]) -> list[dict]:
     """Open includes acknowledged; handle only targets still waiting for ack."""
-    waiting = [i for i in incidents if _status_of(i) in UNACKNOWLEDGED]
-    return waiting or []
+    return [i for i in incidents if _status_of(i) in UNACKNOWLEDGED]
+
+
+def pick_handle_candidate(incidents: list[dict]) -> dict | None:
+    """Match backend handle_highest_priority: prefer never-alerted, else ALERT_SENT."""
+    waiting = unacknowledged(incidents)
+    if not waiting:
+        return None
+    for item in waiting:
+        if _status_of(item) in NEEDS_FIRST_ALERT:
+            return item
+    return waiting[0]
+
+
+async def _timeline(
+    api: CoreApi, incident_id: str, action_name: str, detail: str = ""
+) -> None:
+    try:
+        await api.record_action(incident_id, action_name, detail)
+    except CoreApiError:
+        pass
 
 
 def _incident_lines(incident: dict) -> list[str]:
@@ -149,14 +175,14 @@ def summarize_open(incidents: list[dict]) -> str:
         )
     waiting = unacknowledged(incidents)
     lines.append("")
-    if any(_status_of(i) != "ALERT_SENT" for i in waiting):
+    if any(_status_of(i) in NEEDS_FIRST_ALERT for i in waiting):
         lines.append(
             "Nobody has been alerted yet on the top unacknowledged item. "
             "Say 'Handle our highest-priority methane incident' to brief and notify via Relay."
         )
     elif waiting:
         lines.append(
-            "The operator has been alerted through Relay and has not acknowledged yet."
+            "An operator alert was already requested and acknowledgement is still pending."
         )
     elif "status" in top:
         lines.append(
@@ -168,14 +194,12 @@ def summarize_open(incidents: list[dict]) -> str:
 async def list_open(api: CoreApi) -> str:
     incidents = await api.get_open_incidents()
     if incidents:
-        try:
-            await api.record_action(
-                str(incidents[0]["incident_id"]),
-                "get_open_incidents",
-                f"count={len(incidents)}",
-            )
-        except CoreApiError:
-            pass
+        await _timeline(
+            api,
+            str(incidents[0]["incident_id"]),
+            "get_open_incidents",
+            f"count={len(incidents)}",
+        )
     return summarize_open(incidents)
 
 
@@ -187,11 +211,10 @@ async def _resolve_incident_id(
 ) -> tuple[str | None, list[dict], str | None]:
     """
     Returns (incident_id, open_incidents, error_message).
-    For handle: prefer unacknowledged; never pick a random acknowledged open row.
+    For handle: prefer never-alerted; never pick an already-acknowledged open row.
     """
     open_ones = await api.get_open_incidents(limit=20)
     if routed.incident_id:
-        # Normalize against known open ids when possible.
         wanted = routed.incident_id.upper()
         for item in open_ones:
             iid = str(item.get("incident_id", "")).upper()
@@ -199,12 +222,17 @@ async def _resolve_incident_id(
                 return str(item["incident_id"]), open_ones, None
         return routed.incident_id, open_ones, None
 
-    pool = unacknowledged(open_ones) if for_handle else open_ones
-    if not pool:
-        if for_handle and open_ones:
-            return None, open_ones, "nothing_to_handle"
+    if for_handle:
+        picked = pick_handle_candidate(open_ones)
+        if not picked:
+            if open_ones:
+                return None, open_ones, "nothing_to_handle"
+            return None, open_ones, "no_open"
+        return str(picked["incident_id"]), open_ones, None
+
+    if not open_ones:
         return None, open_ones, "no_open"
-    return str(pool[0]["incident_id"]), open_ones, None
+    return str(open_ones[0]["incident_id"]), open_ones, None
 
 
 async def investigate(api: CoreApi, routed: RoutedIntent) -> str:
@@ -214,12 +242,14 @@ async def investigate(api: CoreApi, routed: RoutedIntent) -> str:
     if err == "no_open" or not incident_id:
         return "No open incidents to investigate."
 
-    steps: list[str] = []
-    steps.append(f"✓ Selected {incident_id} for investigation (read-only — no Relay notify)")
+    steps: list[str] = [
+        f"✓ Selected {incident_id} for investigation (read-only — no Relay notify)"
+    ]
 
     try:
         detail = await api.get_incident(incident_id)
         steps.append("✓ Retrieved incident detail")
+        await _timeline(api, incident_id, "get_incident", "investigate")
     except CoreApiError as e:
         return f"Could not load {incident_id} ({e.code}: {e.message})."
 
@@ -235,6 +265,7 @@ async def investigate(api: CoreApi, routed: RoutedIntent) -> str:
     try:
         evidence = await api.get_evidence(incident_id)
         steps.append("✓ Retrieved provider evidence")
+        await _timeline(api, incident_id, "get_evidence", "")
     except CoreApiError as e:
         steps.append(f"• Evidence unavailable ({e.code})")
 
@@ -242,6 +273,7 @@ async def investigate(api: CoreApi, routed: RoutedIntent) -> str:
         try:
             await api.get_asset(asset_id)
             steps.append(f"✓ Retrieved asset {asset_id}")
+            await _timeline(api, incident_id, "get_asset", str(asset_id))
         except CoreApiError as e:
             steps.append(f"• Asset lookup failed ({e.code})")
     else:
@@ -251,21 +283,22 @@ async def investigate(api: CoreApi, routed: RoutedIntent) -> str:
     try:
         policy = await api.get_escalation_policy(incident_id=incident_id)
         steps.append("✓ Checked escalation policy")
+        await _timeline(api, incident_id, "get_escalation_policy", "")
     except CoreApiError as e:
         steps.append(f"• Policy unavailable ({e.code})")
 
+    history: dict[str, Any] = {}
     try:
-        await api.get_asset_history(incident_id)
-        steps.append("✓ Retrieved asset / source history")
+        history = await api.get_asset_history(incident_id)
+        steps.append("✓ Retrieved detection / asset history")
+        await _timeline(api, incident_id, "get_asset_history", "")
     except CoreApiError:
         pass
 
-    try:
-        await api.record_action(incident_id, "fetch_investigate", "read-only")
-    except CoreApiError:
-        pass
+    await _timeline(api, incident_id, "fetch_investigate", "read-only")
 
     ev_display = _display(evidence) or display
+    hist_display = _display(history)
     priority = row.get("priority") or summary.get("priority") or "?"
     status = detail.get("status") or row.get("status") or summary.get("status") or "?"
     fired = (
@@ -292,14 +325,18 @@ async def investigate(api: CoreApi, routed: RoutedIntent) -> str:
         lines.append(
             f"Provenance: {ev_display.get('provenance') or display.get('provenance')}"
         )
+    if hist_display.get("history"):
+        lines.append(f"History: {hist_display['history']}")
+    if hist_display.get("persistence"):
+        lines.append(f"Persistence: {hist_display['persistence']}")
+    if hist_display.get("previous_incidents"):
+        lines.append(f"Previous: {hist_display['previous_incidents']}")
     if display.get("replay_notice"):
         lines.append(display["replay_notice"])
     elif detail.get("is_replay") or summary.get("is_replay") or evidence.get("is_replay"):
         lines.append("This is a replayed historical observation.")
     if fired or role:
-        lines.append(
-            f"Escalation: rule {fired or '?'} routes to {role or '?'}."
-        )
+        lines.append(f"Escalation: rule {fired or '?'} routes to {role or '?'}.")
     lines.append("")
     lines.append("No operator notification was sent (investigate is read-only).")
     return "\n".join(lines)
@@ -330,37 +367,80 @@ async def handle_incident(api: CoreApi, routed: RoutedIntent) -> str:
     )
     priority = summary.get("priority") or "?"
     steps.append(f"✓ Found {len(open_ones)} unresolved incident(s)")
+    await _timeline(
+        api, incident_id, "get_open_incidents", f"selected {incident_id} ({priority})"
+    )
     steps.append(f"✓ Selected {incident_id} — {priority}")
 
     try:
         detail = await api.get_incident(incident_id)
+        status_now = str(detail.get("status") or _incident_row(detail).get("status") or "")
         steps.append("✓ Retrieved incident detail")
+        await _timeline(
+            api,
+            incident_id,
+            "get_incident",
+            f"{_incident_row(detail).get('match_result', '?')}; status {status_now}",
+        )
     except CoreApiError as e:
         return "\n".join(steps + [f"✗ get_incident failed ({e.code}: {e.message})"])
 
     display = _display(detail)
     asset_id = _asset_id_from(detail, summary)
     asset_label = display.get("asset") or (asset_id or "no registered asset")
+    status_now = str(detail.get("status") or _incident_row(detail).get("status") or "")
+
+    # Idempotent: already alerted → do not send again.
+    if status_now == "ALERT_SENT" or _status_of(summary) == "ALERT_SENT":
+        steps.append(
+            "✓ Incident already ALERT_SENT — skipping Relay send (awaiting acknowledgement)"
+        )
+        await _timeline(
+            api,
+            incident_id,
+            "notify_operator",
+            "already alerted; awaiting acknowledgement, not sent again",
+        )
+        lines = [
+            *steps,
+            "",
+            f"Incident {incident_id} was already alerted. "
+            "No second notification was sent. It is awaiting operator acknowledgement.",
+        ]
+        if display.get("emission"):
+            lines.append(f"Provider-reported emission: {display['emission']}")
+        if display.get("asset"):
+            lines.append(display["asset"])
+        return "\n".join(lines)
 
     if asset_id:
         try:
             await api.get_asset(asset_id)
             steps.append(f"✓ Retrieved asset {asset_id}")
+            await _timeline(api, incident_id, "get_asset", asset_label)
         except CoreApiError as e:
             steps.append(f"• get_asset failed ({e.code}) — continuing")
     else:
         steps.append(f"• Asset: {asset_label}")
+        await _timeline(api, incident_id, "get_asset", asset_label)
 
     try:
         policy = await api.get_escalation_policy(incident_id=incident_id)
         role = policy.get("notify_role") or "?"
         steps.append(f"✓ Checked escalation policy (notify role: {role})")
+        await _timeline(
+            api,
+            incident_id,
+            "get_escalation_policy",
+            f"notify_role={role}",
+        )
     except CoreApiError as e:
         steps.append(f"• get_escalation_policy failed ({e.code}) — continuing")
 
     try:
         evidence = await api.get_evidence(incident_id)
         steps.append("✓ Retrieved evidence")
+        await _timeline(api, incident_id, "get_evidence", "")
     except CoreApiError:
         evidence = {}
         steps.append("• Evidence endpoint unavailable — using incident display fields")
@@ -369,6 +449,7 @@ async def handle_incident(api: CoreApi, routed: RoutedIntent) -> str:
         briefing = await api.generate_briefing(incident_id, "sms")
         src = briefing.get("source") or "?"
         steps.append(f"✓ Prepared incident briefing ({src})")
+        await _timeline(api, incident_id, "generate_briefing", f"sms from {src}")
     except CoreApiError as e:
         return "\n".join(
             steps
@@ -378,12 +459,25 @@ async def handle_incident(api: CoreApi, routed: RoutedIntent) -> str:
             ]
         )
 
-    # Side effect — no automatic retry.
+    prepared = {
+        "text": str(briefing.get("text") or ""),
+        "source": str(briefing.get("source") or "TEMPLATE"),
+    }
+    if prepared["source"] not in ("GROK", "TEMPLATE"):
+        prepared["source"] = "TEMPLATE"
+
+    # Side effect — no automatic retry. Pass prepared text so Relay gets the same briefing.
+    # Do NOT record_action(notify_operator): Core API already records the alert.
     alert: dict[str, Any] | None = None
     notify_ok = False
+    sent_text = prepared["text"]
     try:
-        alert = await api.notify_operator(incident_id, "SMS", actor="FETCH_AGENT")
+        alert = await api.notify_operator(
+            incident_id, "SMS", actor="FETCH_AGENT", briefing=prepared
+        )
         delivery = str(alert.get("delivery_status") or "").upper()
+        if isinstance(alert.get("message_text"), str) and alert["message_text"].strip():
+            sent_text = alert["message_text"].strip()
         if delivery in ("SENT", "DELIVERED"):
             notify_ok = True
             steps.append(
@@ -395,25 +489,12 @@ async def handle_incident(api: CoreApi, routed: RoutedIntent) -> str:
             steps.append(
                 f"• notify_operator returned delivery_status={delivery or 'unknown'}"
             )
-        try:
-            await api.record_action(
-                incident_id, "notify_operator", delivery or "unknown"
-            )
-        except CoreApiError:
-            pass
     except CoreApiError as e:
         steps.append(
             f"✗ Operator notification through Relay failed ({e.code}: {e.message})"
         )
-        try:
-            await api.record_action(
-                incident_id, "notify_operator", f"{e.code}: {e.message}"
-            )
-        except CoreApiError:
-            pass
 
-    # Fresh status after notify attempt.
-    status = detail.get("status") or _incident_row(detail).get("status") or "?"
+    status = status_now
     try:
         refreshed = await api.get_incident(incident_id)
         status = refreshed.get("status") or _incident_row(refreshed).get("status") or status
@@ -426,7 +507,7 @@ async def handle_incident(api: CoreApi, routed: RoutedIntent) -> str:
     if notify_ok:
         lines.append(
             f"Incident {incident_id} notification was sent through Relay "
-            f"and is awaiting operator acknowledgement."
+            "and is awaiting operator acknowledgement."
             if status in UNACKNOWLEDGED
             else f"Incident {incident_id} — current status {status}."
         )
@@ -442,11 +523,14 @@ async def handle_incident(api: CoreApi, routed: RoutedIntent) -> str:
         )
     if display.get("asset"):
         lines.append(display["asset"])
-    briefing_text = (briefing.get("text") or "").strip()
-    if briefing_text:
+    if sent_text and notify_ok:
         lines.append("")
-        lines.append("Briefing sent / prepared:")
-        lines.append(briefing_text)
+        lines.append("Briefing sent through Relay:")
+        lines.append(sent_text)
+    elif prepared["text"] and not notify_ok:
+        lines.append("")
+        lines.append("Briefing prepared (not confirmed sent):")
+        lines.append(prepared["text"])
     return "\n".join(lines)
 
 
@@ -486,30 +570,29 @@ async def status_query(api: CoreApi, routed: RoutedIntent) -> str:
     if status in ("ACKNOWLEDGED", "INVESTIGATING", "RESOLVED"):
         lines.append("")
         lines.append(
-            f"Yes — the operator has acknowledged through Relay "
-            f"(incident is now {status}).{contact_bit}"
+            f"Yes — {incident_id} is acknowledged in CH4SE "
+            f"(current status {status}). "
+            "Acknowledgement may have come from Relay or the dashboard."
+            f"{contact_bit}"
         )
     elif status == "ALERT_SENT":
         lines.append("")
         lines.append(
-            "Not yet. The Relay notification was successfully requested earlier, "
-            "but the incident is still awaiting operator acknowledgement."
+            "Not yet. An operator notification was requested earlier, "
+            "but the incident is still awaiting acknowledgement."
         )
     elif status == "ANALYZED":
         lines.append("")
         lines.append(
-            "Not yet. No successful operator acknowledgement is recorded. "
-            "If you have not handled this incident, say "
+            "Not yet. No acknowledgement is recorded. "
+            "If you want to notify the operator, say "
             "'Handle our highest-priority methane incident.'"
         )
     else:
         lines.append("")
         lines.append(f"Current lifecycle state is {status}.{contact_bit}")
 
-    try:
-        await api.record_action(incident_id, "fetch_status", status)
-    except CoreApiError:
-        pass
+    await _timeline(api, incident_id, "fetch_status", str(status))
     return "\n".join(lines)
 
 
@@ -531,7 +614,6 @@ async def handle_user_request(api: CoreApi, message: str) -> str:
         return f"Core API error ({e.code}): {e.message}"
 
 
-# Sync entry for CLI convenience.
 def handle_user_request_sync(api: Any, message: str) -> str:
     import asyncio
 
