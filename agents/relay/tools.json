@@ -1,0 +1,11 @@
+{
+  "tools": [
+    { "name": "get_incident", "core_action": "get_incident", "parameters": ["incident_id"] },
+    { "name": "get_evidence", "core_action": "get_evidence", "parameters": ["incident_id"] },
+    { "name": "get_asset_history", "core_action": "get_asset_history", "parameters": ["incident_id"] },
+    { "name": "get_escalation_policy", "core_action": "get_escalation_policy", "parameters": ["incident_id"] },
+    { "name": "generate_briefing", "core_action": "generate_briefing", "parameters": ["incident_id", "kind"] },
+    { "name": "acknowledge_incident", "core_action": "acknowledge_incident", "parameters": ["incident_id", "contact_id", "channel", "then_status"] },
+    { "name": "set_incident_status", "core_action": "set_incident_status", "parameters": ["incident_id", "status", "actor", "note"] }
+  ]
+}

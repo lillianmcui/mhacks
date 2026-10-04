@@ -1,0 +1,41 @@
+[
+  {
+    "policy_id": "policy-default",
+    "thresholds": {
+      "EMISSION_CRITICAL_KGH": 500,
+      "EMISSION_HIGH_KGH": 150,
+      "RECURRENCE_MIN_DETECTIONS": 3
+    },
+    "rules": [
+      {
+        "rule_id": "critical-emission",
+        "conditions": { "min_emission": "EMISSION_CRITICAL_KGH" },
+        "priority": "CRITICAL",
+        "notify_role": "site_manager"
+      },
+      {
+        "rule_id": "high-recurring",
+        "conditions": {
+          "min_emission": "EMISSION_HIGH_KGH",
+          "min_detections": "RECURRENCE_MIN_DETECTIONS"
+        },
+        "priority": "HIGH",
+        "notify_role": "site_manager"
+      },
+      {
+        "rule_id": "high-emission",
+        "conditions": { "min_emission": "EMISSION_HIGH_KGH" },
+        "priority": "HIGH",
+        "notify_role": "site_manager"
+      },
+      {
+        "rule_id": "default",
+        "conditions": {},
+        "priority": "LOW",
+        "notify_role": "site_manager"
+      }
+    ],
+    "ambiguous_route_role": "area_supervisor",
+    "no_asset_route_role": "environmental_lead"
+  }
+]
