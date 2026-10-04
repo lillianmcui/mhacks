@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { ActionInputs, ActionName, ActionOutputs, Envelope } from '@ch4se/contracts';
+import type { ActionInput, ActionName, ActionOutput, ApiResponse } from '@ch4se/contracts';
 import { config } from '../config';
 import { connectLive } from './live';
 import { MockBackend } from './mock/mockBackend';
@@ -35,8 +35,8 @@ export class CoreApiError extends Error {
 }
 
 /** Core API write path. Never mutate local state after this resolves; wait for the subscription. */
-export async function callAction<N extends ActionName>(name: N, body: ActionInputs[N]): Promise<ActionOutputs[N]> {
-  let env: Envelope<ActionOutputs[N]>;
+export async function callAction<N extends ActionName>(name: N, body: ActionInput<N>): Promise<ActionOutput<N>> {
+  let env: ApiResponse<ActionOutput<N>>;
   if (config.coreApi === 'mock') {
     env = await mock!.call(name, body);
   } else {
@@ -49,7 +49,7 @@ export async function callAction<N extends ActionName>(name: N, body: ActionInpu
       body: JSON.stringify(body),
     });
     try {
-      env = (await res.json()) as Envelope<ActionOutputs[N]>;
+      env = (await res.json()) as ApiResponse<ActionOutput<N>>;
     } catch {
       throw new CoreApiError('HTTP_' + res.status, `Core API returned non-JSON (${res.status})`);
     }

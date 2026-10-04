@@ -4,17 +4,18 @@ import { fileURLToPath } from 'node:url';
 
 const r = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
-// Until the backend lands packages/contracts and packages/stdb-bindings, these
-// aliases point at local shims. Repoint them (here AND in tsconfig.json paths)
-// to ../../packages/* once those exist; no app code should need to change.
+// The contracts and the generated SpacetimeDB bindings are the backend's
+// packages, used from source. Keep these aliases in step with tsconfig.json
+// paths. `spacetimedb` itself resolves from packages/stdb-bindings/node_modules,
+// so run `make install` at the repo root first.
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@ch4se/contracts/format': r('./src/contracts-shim/format.ts'),
-      '@ch4se/contracts': r('./src/contracts-shim/index.ts'),
-      '@ch4se/stdb-bindings': r('./src/contracts-shim/stdb-bindings.ts'),
+      '@ch4se/contracts': r('../../packages/contracts/src/index.ts'),
+      '@ch4se/stdb-bindings': r('../../packages/stdb-bindings/src/index.ts'),
     },
   },
-  server: { port: 5173 },
+  // The aliased packages live outside this app's root.
+  server: { port: 5173, fs: { allow: [r('../..')] } },
 });

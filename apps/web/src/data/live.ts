@@ -1,31 +1,40 @@
-import { DbConnection } from '@ch4se/stdb-bindings';
+import {
+  DbConnection,
+  toAcknowledgement,
+  toAction,
+  toAlert,
+  toAsset,
+  toContact,
+  toIncident,
+  toMethaneEvent,
+  toProviderSource,
+} from '@ch4se/stdb-bindings';
 import { config } from '../config';
 import type { DbStore, TableName, TableRows } from './store';
 import { TABLE_NAMES } from './store';
 
 /**
- * SpacetimeDB -> DbStore adapter. Written against the SpacetimeDB TS SDK's
- * generated-bindings shape (DbConnection.builder(), conn.db.<table>.onInsert...).
- * VERIFY at CP0 against the actual generated bindings:
- *   - SQL table names and `conn.db` accessor names below
- *   - builder method for the module (withModuleName vs withDatabaseName)
- *   - row field casing (codegen emits camelCase; contracts are snake_case)
+ * SpacetimeDB -> DbStore adapter over the backend's generated bindings
+ * (packages/stdb-bindings). Rows are converted to contract shape (snake_case,
+ * ISO timestamps, null for none) by the backend's own `to*` mappers.
  */
-const TABLES: Record<TableName, { sql: string; accessor: string }> = {
-  MethaneEvent: { sql: 'methane_event', accessor: 'methaneEvent' },
-  ProviderSource: { sql: 'provider_source', accessor: 'providerSource' },
-  Asset: { sql: 'asset', accessor: 'asset' },
-  Contact: { sql: 'contact', accessor: 'contact' },
-  Incident: { sql: 'incident', accessor: 'incident' },
-  Alert: { sql: 'alert', accessor: 'alert' },
-  Acknowledgement: { sql: 'acknowledgement', accessor: 'acknowledgement' },
-  Action: { sql: 'action', accessor: 'action' },
+type Mapper<K extends TableName> = (row: never) => TableRows[K];
+const TABLES: { [K in TableName]: { sql: string; accessor: string; map: Mapper<K> } } = {
+  MethaneEvent: { sql: 'methane_event', accessor: 'methaneEvent', map: toMethaneEvent },
+  ProviderSource: { sql: 'provider_source', accessor: 'providerSource', map: toProviderSource },
+  Asset: { sql: 'asset', accessor: 'asset', map: toAsset },
+  Contact: { sql: 'contact', accessor: 'contact', map: toContact },
+  Incident: { sql: 'incident', accessor: 'incident', map: toIncident },
+  Alert: { sql: 'alert', accessor: 'alert', map: toAlert },
+  Acknowledgement: { sql: 'acknowledgement', accessor: 'acknowledgement', map: toAcknowledgement },
+  Action: { sql: 'action', accessor: 'action', map: toAction },
 };
 
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 10000;
 
-// Minimal structural types so this compiles before bindings are generated.
+// The slice of the generated connection this adapter uses, so tables can be
+// bound in a loop instead of one hand-written block per table.
 type RowCb = (ctx: unknown, ...rows: unknown[]) => void;
 interface TableHandle {
   onInsert(cb: RowCb): void;
@@ -43,8 +52,7 @@ interface Conn {
 }
 interface Builder {
   withUri(uri: string): Builder;
-  withModuleName?(name: string): Builder;
-  withDatabaseName?(name: string): Builder;
+  withDatabaseName(name: string): Builder;
   withToken(token?: string): Builder;
   onConnect(cb: (conn: Conn, identity: unknown, token: string) => void): Builder;
   onDisconnect(cb: (ctx: unknown, err?: unknown) => void): Builder;
@@ -55,11 +63,7 @@ interface Builder {
 const TOKEN_KEY = 'ch4se.stdb.token';
 
 export function connectLive(store: DbStore): () => void {
-  const Db = DbConnection as { builder(): Builder } | null;
-  if (!Db) {
-    store.setConnection('error', 'packages/stdb-bindings not generated yet');
-    return () => {};
-  }
+  const Db = DbConnection as unknown as { builder(): Builder };
 
   let conn: Conn | null = null;
   let attempt = 0;
@@ -74,9 +78,9 @@ export function connectLive(store: DbStore): () => void {
   };
 
   function open() {
-    let b = Db!.builder().withUri(config.stdbUri);
-    b = b.withDatabaseName ? b.withDatabaseName(config.stdbModule) : b.withModuleName!(config.stdbModule);
-    conn = b
+    conn = Db.builder()
+      .withUri(config.stdbUri)
+      .withDatabaseName(config.stdbModule)
       .withToken(localStorage.getItem(TOKEN_KEY) ?? undefined)
       .onConnect((c, _identity, token) => {
         localStorage.setItem(TOKEN_KEY, token);
@@ -113,31 +117,10 @@ function bindTables(conn: Conn, store: DbStore) {
       console.warn(`[stdb] no table accessor "${TABLES[t].accessor}" on conn.db`);
       continue;
     }
-    const up = (row: unknown) => store.upsert(t, normalizeRow(row) as TableRows[typeof t]);
+    const map = TABLES[t].map as (row: unknown) => TableRows[typeof t];
+    const up = (row: unknown) => store.upsert(t, map(row));
     handle.onInsert((_ctx, row) => up(row));
     handle.onUpdate?.((_ctx, _old, row) => up(row));
-    handle.onDelete((_ctx, row) => store.delete(t, normalizeRow(row) as TableRows[typeof t]));
+    handle.onDelete((_ctx, row) => store.delete(t, map(row)));
   }
-}
-
-const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-
-/** Generated row -> contract shape: snake_case keys, ISO timestamps, string ids, null for None. */
-export function normalizeRow(v: unknown): unknown {
-  if (v === undefined) return null;
-  if (typeof v === 'bigint') return v.toString();
-  if (Array.isArray(v)) return v.map(normalizeRow);
-  if (v && typeof v === 'object') {
-    const o = v as Record<string, unknown> & { toDate?: () => Date; tag?: string; value?: unknown };
-    if (typeof o.toDate === 'function') return o.toDate().toISOString();
-    // Sum-type enums come through as { tag: 'ANALYZED' } in the TS SDK.
-    if (typeof o.tag === 'string' && Object.keys(o).every((k) => k === 'tag' || k === 'value')) {
-      const unit = o.value === undefined || (typeof o.value === 'object' && o.value !== null && Object.keys(o.value).length === 0);
-      if (o.tag === 'none') return null;
-      if (o.tag === 'some') return normalizeRow(o.value);
-      return unit ? o.tag : normalizeRow(o.value);
-    }
-    return Object.fromEntries(Object.entries(o).map(([k, val]) => [snake(k), normalizeRow(val)]));
-  }
-  return v;
 }

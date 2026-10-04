@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { formatProvenance } from '@ch4se/contracts/format';
+import { formatProvenance } from '@ch4se/contracts';
 import { Attribution } from '../components/Attribution';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
 import { ReplayBanner } from '../components/ReplayBanner';
@@ -30,6 +30,8 @@ export function Operator() {
   }, [incidentId, runBriefing]);
 
   const err = ack.error ?? investigate.error ?? briefing.error;
+  // The backend needs a contact to record the acknowledgement against.
+  const contactId = view?.incident.assigned_contact_id ?? null;
 
   return (
     <div className="operator">
@@ -49,7 +51,7 @@ export function Operator() {
             <StatusHeadline status={view.incident.status} priority={view.incident.priority} />
             {view.event && (
               <p className="card__muted">
-                {formatProvenance(view.event.provider, view.event.instrument, view.event.scene_timestamp)}
+                {formatProvenance(view.event)}
               </p>
             )}
 
@@ -66,14 +68,11 @@ export function Operator() {
             <div className="phone__actions">
               <button
                 className="btn btn--primary btn--lg"
-                disabled={ack.pending || !canAcknowledge(view.incident.status)}
-                onClick={() =>
-                  ack.run({
-                    incident_id: view.incident.incident_id,
-                    contact_id: view.incident.assigned_contact_id,
-                    channel: 'DASHBOARD',
-                  })
-                }
+                disabled={ack.pending || contactId === null || !canAcknowledge(view.incident.status)}
+                onClick={() => {
+                  if (contactId === null) return;
+                  void ack.run({ incident_id: view.incident.incident_id, contact_id: contactId, channel: 'DASHBOARD' });
+                }}
               >
                 {ack.pending ? 'Acknowledging…' : 'Acknowledge'}
               </button>
@@ -91,6 +90,9 @@ export function Operator() {
                 {investigate.pending ? 'Updating…' : 'Mark investigating'}
               </button>
             </div>
+            {contactId === null && (
+              <p className="card__muted">No contact is assigned to this incident, so it cannot be acknowledged here.</p>
+            )}
             {err && (
               <p className="fallback__error">
                 {err.code}: {err.message}

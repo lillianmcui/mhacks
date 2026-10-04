@@ -6,6 +6,9 @@ import { DEMO_BBOX } from '../config';
 import { circlePolygon, EMPTY_FC } from './geo';
 import { mapStyle } from './style';
 
+/** `plume_bounds` ([west, south, east, north]) is not in the backend contract yet; the P1 overlay stays off without it. */
+type MapEvent = MethaneEvent & { plume_bounds?: [number, number, number, number] | null };
+
 interface Props {
   assets: Asset[];
   events: MethaneEvent[];
@@ -141,7 +144,7 @@ export function EventMap({ assets, events, focusEvent, highlightAssetId, candida
   return <div ref={containerRef} className="map" />;
 }
 
-function syncPlumeImage(map: maplibregl.Map, ev: MethaneEvent | undefined) {
+function syncPlumeImage(map: maplibregl.Map, ev: MapEvent | undefined) {
   const has = map.getSource('plume-png') as ImageSource | undefined;
   if (!ev?.plume_png || !ev.plume_bounds) {
     if (has) {
