@@ -85,6 +85,7 @@ async def handle_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
     text = chat_text(msg)
     if not text:
         return
+    ctx.logger.info("chat from %s: %s", sender, text)
     try:
         # The Core API client is blocking; keep the agent's event loop free.
         reply = await asyncio.to_thread(handle_user_request, HttpCoreApi(), text)
