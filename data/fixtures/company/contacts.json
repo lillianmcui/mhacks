@@ -1,21 +1,21 @@
 [
   {
     "contact_id": "contact-ops-lead",
-    "name": "Ops Lead (teammate)",
+    "name": "Jordan Reyes",
     "role": "site_manager",
     "phone": "+17348825725",
     "area_id": "permian-north"
   },
   {
     "contact_id": "contact-area-mgr",
-    "name": "Area Manager (teammate)",
+    "name": "Priya Natarajan",
     "role": "area_supervisor",
     "phone": "+17348825725",
     "area_id": "permian-north"
   },
   {
     "contact_id": "contact-env",
-    "name": "Environmental Lead (teammate)",
+    "name": "Sam Okafor",
     "role": "environmental_lead",
     "phone": "+17348825725",
     "area_id": "permian-north"
