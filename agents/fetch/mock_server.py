@@ -96,7 +96,7 @@ def dispatch(action: str, body: dict[str, Any]) -> dict:
                 "candidates": [],
                 "assigned_contact": {
                     "contact_id": CONTACT_ID,
-                    "name": "Ops Lead (teammate)",
+                    "name": "Jordan Reyes",
                     "role": "site_manager",
                 },
                 "status": "ANALYZED",
@@ -123,7 +123,7 @@ def dispatch(action: str, body: dict[str, Any]) -> dict:
                 "longitude": -103.4495,
                 "contact": {
                     "contact_id": CONTACT_ID,
-                    "name": "Ops Lead (teammate)",
+                    "name": "Jordan Reyes",
                     "role": "site_manager",
                     "phone": "+1REPLACE_ME",
                 },
