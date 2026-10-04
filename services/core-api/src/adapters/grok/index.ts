@@ -3,6 +3,11 @@ import { assertNumbersGroundedInInput } from "./numberCheck.ts";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+const PLAIN_TEXT_RULES = [
+  "Output plain text only: no markdown, no asterisks, no #, no backticks, no bold or italics.",
+  "Never write JSON keys or field paths (such as display.emission, match_result, notify_role); write the values in plain words.",
+].join(" ");
+
 export interface GrokBriefingResult {
   text: string;
 }
@@ -43,18 +48,40 @@ export async function grokBriefing(
           'Never say "caused by". Say associated/nearest registered asset wording from display.asset.',
           "If match_result is not MATCHED, the Do-now steps must say the match is uncertain.",
           "Do not dump wind, IPCC, persistence, history, or provenance unless kind is not sms.",
+          PLAIN_TEXT_RULES,
         ].join(" ")
-      : [
-          "You write operator briefings for methane incident response.",
-          "Use ONLY facts from the JSON input.",
-          "Quote every emission, uncertainty, timestamp, persistence, count, and distance using the exact display strings provided under display.*.",
-          "Never rewrite dates in prose (do not turn 2026-08-13 into August 13). Copy display.scene_timestamp and display.provenance verbatim.",
-          "Never compute or infer new numbers.",
-          'Say "associated asset" or "nearest registered asset", never "caused by".',
-          "When display.replay_notice is present, include that this is a replayed historical observation.",
-          "If incident.match_result is not MATCHED, state uncertainty explicitly.",
-          "Keep operator/summary briefings under ~180 words.",
-        ].join(" ");
+      : kind === "operator"
+        ? [
+            "You write a short operator briefing for a methane incident, shown on a phone screen.",
+            "Use ONLY facts from the JSON. Copy the display strings verbatim for every quantity, date and distance; never compute, round or reword numbers or dates.",
+            "Output exactly these lines, one fact per line, under 70 words total:",
+            "line 1: '{priority} priority · {incident_id}'",
+            "line 2: the replay notice string",
+            "blank line",
+            "the asset string, as given",
+            "'Release: ' + the emission string",
+            "'Seen: ' + the provenance string",
+            "'Wind: ' + the wind string, only if it is not null",
+            "'History: ' + the history string",
+            "'Routed to: ' + assigned contact name and role, or the notify role",
+            "'Caution: ' + one short sentence, only if the match is not MATCHED",
+            "blank line",
+            "'Next:' then two or three lines starting with '- ', each under 10 words, no digits.",
+            'Say "associated asset" or "nearest registered asset", never "caused by".',
+            PLAIN_TEXT_RULES,
+          ].join(" ")
+        : [
+            "You write operator briefings for methane incident response.",
+            "Use ONLY facts from the JSON input.",
+            "Quote every emission, uncertainty, timestamp, persistence, count, and distance using the exact display strings provided under display.*.",
+            "Never rewrite dates in prose (do not turn 2026-08-13 into August 13). Copy display.scene_timestamp and display.provenance verbatim.",
+            "Never compute or infer new numbers.",
+            'Say "associated asset" or "nearest registered asset", never "caused by".',
+            "When display.replay_notice is present, include that this is a replayed historical observation.",
+            "If incident.match_result is not MATCHED, state uncertainty explicitly.",
+            "Keep summary briefings under ~120 words.",
+            PLAIN_TEXT_RULES,
+          ].join(" ");
 
   const user = JSON.stringify({ kind, briefing: input }, null, 2);
 

@@ -13,6 +13,9 @@ export function renderTemplateBriefing(
   if (kind === "sms") {
     return renderSms(input);
   }
+  if (kind === "operator") {
+    return renderOperator(input);
+  }
 
   const uncertain =
     incident.match_result !== "MATCHED"
@@ -40,7 +43,33 @@ export function renderTemplateBriefing(
     display.attribution,
   ].filter((line): line is string => line !== null);
 
-  return lines.join(kind === "summary" ? " " : "\n");
+  return lines.join(" ");
+}
+
+/** Operator page briefing: one fact per labelled line, then next steps. */
+function renderOperator(input: BriefingInput): string {
+  const { display, incident, policy_rule, assigned_contact } = input;
+  const routed = assigned_contact
+    ? `${assigned_contact.name} (${assigned_contact.role})`
+    : policy_rule.notify_role;
+  const lines = [
+    `${incident.priority} priority · ${incident.incident_id}`,
+    display.replay_notice,
+    "",
+    display.asset,
+    `Release: ${display.emission}`,
+    `Seen: ${display.provenance}`,
+    display.wind ? `Wind: ${display.wind}` : null,
+    `History: ${display.history}`,
+    `Routed to: ${routed} · rule ${policy_rule.rule_id}`,
+    incident.match_result !== "MATCHED"
+      ? "Caution: the asset match is uncertain; verify on site."
+      : null,
+    "",
+    "Next:",
+    ...nextSteps(input).map((s) => `- ${s}`),
+  ];
+  return lines.filter((l): l is string => l !== null).join("\n");
 }
 
 /** Short mobile / Relay alert — scannable, no walls of text. */
