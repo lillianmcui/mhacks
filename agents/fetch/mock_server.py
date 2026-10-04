@@ -19,7 +19,11 @@ from urllib.parse import urlparse
 
 HOST = os.environ.get("MOCK_CORE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("MOCK_CORE_PORT", "8787"))
-TOKEN = os.environ.get("CORE_API_BEARER", "dev-bearer")
+TOKEN = (
+    os.environ.get("CORE_API_TOKEN")
+    or os.environ.get("CORE_API_BEARER")
+    or "dev-bearer"
+)
 
 INCIDENT_ID = "inc-stub-001"
 ASSET_ID = "TX-184"
@@ -117,7 +121,8 @@ def dispatch(action: str, body: dict[str, Any]) -> dict:
     if action == "notify_operator":
         if body.get("incident_id") != INCIDENT_ID:
             return err("NOT_FOUND", "incident")
-        return ok({"alert_id": "alert-stub-001", "delivery_status": "queued"})
+        # Contract DeliveryStatus: SENT | DELIVERED | FAILED
+        return ok({"alert_id": "alert-stub-001", "delivery_status": "SENT"})
 
     if action == "record_action":
         ACTIONS.append(body)

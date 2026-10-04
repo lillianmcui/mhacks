@@ -13,7 +13,7 @@ load_dotenv()
 
 app = FastAPI(title="CH4SE Relay webhook")
 BASE = os.environ.get("CORE_API_BASE", "http://127.0.0.1:8787").rstrip("/")
-TOKEN = os.environ.get("CORE_API_BEARER", "")
+TOKEN = os.environ.get("CORE_API_TOKEN") or os.environ.get("CORE_API_BEARER", "")
 SECRET = os.environ.get("RELAY_WEBHOOK_SECRET", "")
 
 

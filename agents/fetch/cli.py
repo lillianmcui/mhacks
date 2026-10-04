@@ -25,8 +25,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if not os.environ.get("CORE_API_BEARER"):
-        print("Set CORE_API_BEARER (and CORE_API_BASE). See .env.example", file=sys.stderr)
+    if not (os.environ.get("CORE_API_TOKEN") or os.environ.get("CORE_API_BEARER")):
+        print(
+            "Set CORE_API_TOKEN or CORE_API_BEARER (and CORE_API_BASE). See .env.example",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     api = HttpCoreApi()

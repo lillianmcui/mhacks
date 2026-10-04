@@ -48,10 +48,35 @@ def summarize_open(incidents: list[dict]) -> str:
     return f"{head} {priority}".strip()
 
 
+def format_handle_result(result: dict[str, Any]) -> str:
+    """Format backend handle_highest_priority data for the operator."""
+    incident = result.get("incident") or {}
+    incident_id = incident.get("incident_id") or result.get("incident_id") or "?"
+    steps = result.get("steps") or []
+    briefing = result.get("briefing") or {}
+    lines = [f"Handled {incident_id}."]
+    for step in steps:
+        name = step.get("step", "?")
+        detail = step.get("detail", "")
+        ok = step.get("ok")
+        if ok is False:
+            lines.append(f"  [fail] {name}: {detail}")
+        else:
+            lines.append(f"  [ok] {name}: {detail}")
+        if name == "notify_operator" and isinstance(detail, str) and "already alerted" in detail.lower():
+            lines.append("  (repeat handle: no second SMS sent)")
+    text = briefing.get("text")
+    if text:
+        lines.append(f"SMS briefing:\n{text}")
+    elif result.get("summary"):
+        lines.append(str(result["summary"]))
+    return "\n".join(lines)
+
+
 def run_handle_sequence(api: CoreApi, incident_id: str) -> dict[str, Any]:
     """
-    Product Direction / TRACK_AGENTS_DATA §4 sequence.
-    Records an Action after each step with actor FETCH_AGENT (via api.record_action).
+    Local fallback sequence when handle_highest_priority is not implemented.
+    Prefer the Core API one-shot once backend is merged (identical dashboard path).
     """
     detail = api.get_incident(incident_id)
     api.record_action(incident_id, "get_incident", "Fetch agent sequence")
@@ -67,10 +92,20 @@ def run_handle_sequence(api: CoreApi, incident_id: str) -> dict[str, Any]:
     briefing = api.generate_briefing(incident_id, "sms")
     api.record_action(incident_id, "generate_briefing", str(briefing.get("source", "")))
 
-    alert = api.notify_operator(incident_id, "SMS")
-    api.record_action(
-        incident_id, "notify_operator", str(alert.get("delivery_status", ""))
-    )
+    try:
+        alert = api.notify_operator(incident_id, "SMS")
+        api.record_action(
+            incident_id, "notify_operator", str(alert.get("delivery_status", ""))
+        )
+    except CoreApiError as e:
+        # Backend: INVALID_TRANSITION once acknowledged; UPSTREAM_UNAVAILABLE if Relay down.
+        api.record_action(incident_id, "notify_operator", f"{e.code}: {e.message}")
+        return {
+            "incident_id": incident_id,
+            "briefing": briefing,
+            "alert": None,
+            "summary": f"{briefing.get('text') or ''}\nNotify failed: {e.code}: {e.message}".strip(),
+        }
 
     return {
         "incident_id": incident_id,
@@ -101,11 +136,13 @@ def handle_user_request(api: CoreApi, message: str) -> str:
     if "handle" in text and "priority" in text:
         try:
             result = api.handle_highest_priority()
-            return str(result.get("summary") or result)
+            if isinstance(result, dict):
+                return format_handle_result(result)
+            return str(result)
         except CoreApiError as e:
-            # Prefer backend one-shot when available; fall back to local sequence.
             if e.code == "NO_OPEN_INCIDENTS":
                 return "No open incidents to handle."
+            # Prefer backend one-shot when available; fall back only if action missing.
             if e.code != "NOT_FOUND":
                 raise
 

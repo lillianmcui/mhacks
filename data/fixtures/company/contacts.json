@@ -9,7 +9,14 @@
   {
     "contact_id": "contact-area-mgr",
     "name": "Area Manager (teammate)",
-    "role": "area_manager",
+    "role": "area_supervisor",
+    "phone": "+1REPLACE_ME",
+    "area_id": "permian-north"
+  },
+  {
+    "contact_id": "contact-env",
+    "name": "Environmental Lead (teammate)",
+    "role": "environmental_lead",
     "phone": "+1REPLACE_ME",
     "area_id": "permian-north"
   }

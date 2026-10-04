@@ -15,13 +15,14 @@ def _base() -> str:
 
 
 def _token() -> str:
-    return os.environ.get("CORE_API_BEARER", "")
+    # Backend root .env uses CORE_API_TOKEN; agents historically used CORE_API_BEARER.
+    return os.environ.get("CORE_API_TOKEN") or os.environ.get("CORE_API_BEARER", "")
 
 
 def _post(action: str, body: dict[str, Any] | None = None) -> Any:
     token = _token()
     if not token:
-        raise RuntimeError("CORE_API_BEARER is not set")
+        raise RuntimeError("CORE_API_TOKEN or CORE_API_BEARER is not set")
     url = f"{_base()}/actions/{action}"
     headers = {
         "Authorization": f"Bearer {token}",

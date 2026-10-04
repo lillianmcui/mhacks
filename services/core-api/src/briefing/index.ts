@@ -1,2 +1,2 @@
-export { renderTemplateBriefing } from "./template.js";
-export type { BriefingInput, BriefingKind } from "./types.js";
+export { renderTemplateBriefing } from "./template.ts";
+export type { BriefingInput, BriefingKind } from "./types.ts";

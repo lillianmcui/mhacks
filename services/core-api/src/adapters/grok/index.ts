@@ -1,5 +1,5 @@
-import type { BriefingInput, BriefingKind } from "../../briefing/types.js";
-import { assertNumbersGroundedInInput } from "./numberCheck.js";
+import type { BriefingInput, BriefingKind } from "../../briefing/types.ts";
+import { assertNumbersGroundedInInput } from "./numberCheck.ts";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
@@ -7,6 +7,10 @@ export interface GrokBriefingResult {
   text: string;
 }
 
+/**
+ * §3.8 grokBriefing. Throws on missing key, timeout, empty content, or number-check failure.
+ * Core API catches and falls back to template.
+ */
 export async function grokBriefing(
   input: BriefingInput,
   kind: BriefingKind,
@@ -24,11 +28,11 @@ export async function grokBriefing(
   const system = [
     "You write operator briefings for methane incident response.",
     "Use ONLY facts from the JSON input.",
-    "Quote every emission, uncertainty, timestamp, persistence, count, and distance using the exact display strings provided.",
+    "Quote every emission, uncertainty, timestamp, persistence, count, and distance using the exact display strings provided under display.*.",
     "Never compute or infer new numbers.",
     'Say "associated asset" or "nearest registered asset", never "caused by".',
-    'Say "replayed historical observation" when is_replay is true.',
-    "If match_result is not MATCHED or evidence_caveats is non-empty, state uncertainty explicitly.",
+    "When display.replay_notice is present, include that this is a replayed historical observation.",
+    "If incident.match_result is not MATCHED, state uncertainty explicitly.",
   ].join(" ");
 
   const user = JSON.stringify({ kind, briefing: input }, null, 2);
@@ -64,6 +68,7 @@ export async function grokBriefing(
       throw new Error("Grok returned empty content");
     }
 
+    // Number-check against the full BriefingInput JSON (includes rounded display strings).
     assertNumbersGroundedInInput(text, { kind, briefing: input });
     return { text };
   } catch (err) {
@@ -79,4 +84,4 @@ export async function grokBriefing(
   }
 }
 
-export { assertNumbersGroundedInInput, extractNumbers } from "./numberCheck.js";
+export { assertNumbersGroundedInInput, extractNumbers } from "./numberCheck.ts";

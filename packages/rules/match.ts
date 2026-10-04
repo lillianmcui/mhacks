@@ -20,7 +20,8 @@ export interface MatchOutput {
   candidates: MatchCandidate[];
 }
 
-const EARTH_RADIUS_M = 6_371_000;
+/** Same mean radius as backend stand-in (merge-compatible distances). */
+const EARTH_RADIUS_M = 6_371_008.8;
 
 /** Haversine distance in meters between two WGS84 points. */
 export function haversineM(

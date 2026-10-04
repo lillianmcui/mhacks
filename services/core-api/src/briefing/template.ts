@@ -1,85 +1,48 @@
-import type { BriefingInput, BriefingKind } from "./types.js";
+import type { BriefingInput, BriefingKind } from "./types.ts";
 
-function caveatsBlock(input: BriefingInput): string {
-  const lines: string[] = [];
-  if (input.match_result !== "MATCHED") {
-    if (input.match_result === "AMBIGUOUS") {
-      lines.push(
-        input.display.candidates ??
-          "Multiple registered assets are near this plume origin; match is ambiguous.",
-      );
-    } else {
-      lines.push("No registered asset is within the matching radius of this plume origin.");
-    }
-  }
-  for (const c of input.evidence_caveats ?? []) {
-    lines.push(c);
-  }
-  return lines.length ? `\n\nNote: ${lines.join(" ")}` : "";
-}
-
-function replayPrefix(input: BriefingInput): string {
-  return input.is_replay
-    ? "This is a replayed historical observation from Carbon Mapper, not a live event."
-    : "";
-}
-
+/**
+ * Deterministic template. Uses ONLY `display` strings for numbers/dates/counts.
+ * Never formats provider numbers itself.
+ */
 export function renderTemplateBriefing(
   input: BriefingInput,
   kind: BriefingKind,
 ): string {
-  const replay = replayPrefix(input);
-  const emission =
-    input.display.emission_with_uncertainty ?? input.display.emission ?? "emission unavailable";
-  const when = input.display.scene_timestamp ?? "observation time unavailable";
-  const assetPhrase =
-    input.match_result === "MATCHED" && input.asset_id
-      ? `associated asset ${input.asset_id}${input.facility_type ? ` (${input.facility_type})` : ""}`
-      : "nearest registered asset (match not confirmed)";
-
-  const caveats = caveatsBlock(input);
+  const { display, incident, policy_rule, asset } = input;
+  const uncertain =
+    incident.match_result !== "MATCHED"
+      ? "The asset match is uncertain; verify on site before acting."
+      : null;
 
   if (kind === "sms") {
     const parts = [
-      replay,
-      `CH4SE alert: ${emission} at ${when}.`,
-      `Review ${assetPhrase}.`,
-      input.display.priority ? `Priority: ${input.display.priority}.` : "",
-      input.display.policy_action ?? "",
+      `CH4SE ${incident.priority} methane incident ${incident.incident_id}.`,
+      display.asset,
+      `Emission estimate: ${display.emission}.`,
+      display.provenance,
+      display.replay_notice,
+      uncertain,
     ].filter(Boolean);
-    // Prefer keeping caveat text intact; trim the main body if needed.
-    const body = parts.join(" ");
-    const maxBody = Math.max(0, 320 - caveats.length);
-    return body.slice(0, maxBody) + caveats;
+    return parts.join(" ");
   }
 
-  if (kind === "summary") {
-    return [
-      replay,
-      `Observation ${when}: ${emission}.`,
-      `Facility context: ${assetPhrase}${input.operator_name ? `, operator ${input.operator_name}` : ""}.`,
-      input.display.persistence ? `Persistence: ${input.display.persistence}.` : "",
-      input.display.history ?? "",
-      input.display.policy_action ?? "",
-    ]
-      .filter(Boolean)
-      .join("\n") + caveats;
-  }
+  const lines = [
+    `CH4SE ${incident.priority} methane incident ${incident.incident_id}.`,
+    display.replay_notice,
+    display.asset,
+    `Emission estimate: ${display.emission}.`,
+    display.provenance,
+    display.distance ? `Distance: ${display.distance}.` : null,
+    display.wind ? `Wind: ${display.wind}.` : null,
+    display.persistence ? `Persistence: ${display.persistence}.` : null,
+    `Observation history: ${display.history}; ${display.previous_incidents}.`,
+    `Policy rule ${policy_rule.rule_id} routes this to ${policy_rule.notify_role}.`,
+    asset
+      ? `Operator context: ${asset.operator_name} (${asset.facility_type}).`
+      : null,
+    uncertain,
+    display.attribution,
+  ].filter((line): line is string => line !== null);
 
-  // operator
-  return [
-    replay,
-    `You are being contacted about a methane plume observation recorded on ${when}.`,
-    `Estimated release: ${emission}.`,
-    `This plume origin is linked to the ${assetPhrase}.`,
-    input.display.wind ? `Wind: ${input.display.wind}.` : "",
-    input.display.plume_quality ? `Plume quality: ${input.display.plume_quality}.` : "",
-    input.display.persistence ? `Source persistence (provider): ${input.display.persistence}.` : "",
-    input.display.history ?? "",
-    input.display.policy_action
-      ? `Escalation policy: ${input.display.policy_action}.`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n") + caveats;
+  return lines.join(kind === "summary" ? " " : "\n");
 }

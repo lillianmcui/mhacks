@@ -1,3 +1,6 @@
+/** DeliveryStatus from packages/contracts (SENT | DELIVERED | FAILED). */
+export type DeliveryStatus = "SENT" | "DELIVERED" | "FAILED";
+
 export type RelayChannel = "SMS" | "CALL";
 
 export interface RelaySendInput {
@@ -7,13 +10,23 @@ export interface RelaySendInput {
 }
 
 export interface RelaySendResult {
-  delivery_status: "sent" | "failed" | "queued";
-  provider_ref?: string;
+  delivery_status: DeliveryStatus;
+  provider_ref: string;
+}
+
+function mapDeliveryStatus(raw: string | undefined): DeliveryStatus {
+  const s = (raw ?? "").toUpperCase();
+  if (s === "FAILED" || s === "FAIL") return "FAILED";
+  if (s === "DELIVERED") return "DELIVERED";
+  return "SENT";
 }
 
 /**
- * Outbound SMS/voice via Relay sponsor API.
- * Set RELAY_API_KEY and RELAY_API_BASE in Core API env (never commit keys).
+ * Outbound SMS/voice via Relay. Throws when misconfigured or upstream errors
+ * (Core API maps throws → UPSTREAM_UNAVAILABLE).
+ *
+ * Env (repo-root `.env` only): RELAY_API_KEY, RELAY_API_BASE,
+ * optional RELAY_SMS_PATH / RELAY_CALL_PATH.
  */
 export async function relaySend(input: RelaySendInput): Promise<RelaySendResult> {
   const apiKey = process.env.RELAY_API_KEY;
@@ -24,8 +37,8 @@ export async function relaySend(input: RelaySendInput): Promise<RelaySendResult>
 
   const path =
     input.channel === "SMS"
-      ? process.env.RELAY_SMS_PATH ?? "/v1/messages"
-      : process.env.RELAY_CALL_PATH ?? "/v1/calls";
+      ? (process.env.RELAY_SMS_PATH ?? "/v1/messages")
+      : (process.env.RELAY_CALL_PATH ?? "/v1/calls");
 
   const res = await fetch(`${base}${path}`, {
     method: "POST",
@@ -47,7 +60,7 @@ export async function relaySend(input: RelaySendInput): Promise<RelaySendResult>
 
   const data = (await res.json()) as { id?: string; status?: string };
   return {
-    delivery_status: data.status === "failed" ? "failed" : "sent",
-    provider_ref: data.id,
+    delivery_status: mapDeliveryStatus(data.status),
+    provider_ref: data.id ?? `relay-${Date.now()}`,
   };
 }

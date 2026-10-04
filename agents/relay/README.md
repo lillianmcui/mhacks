@@ -2,6 +2,11 @@
 
 **Time-box:** 45–90 minutes to pass P0 criteria (§5.3 in TRACK_AGENTS_DATA.md). If not, stop and let the dashboard be the P0 operator surface.
 
+## Env
+
+- Webhook process: `agents/relay/.env` — `CORE_API_BASE` + `CORE_API_TOKEN`.
+- Outbound Relay/Grok keys: **repo-root** `.env` only (`RELAY_API_KEY`, `RELAY_API_BASE`, …). `services/core-api/.env` is not loaded.
+
 ## Capability checklist (verify in first hour — do not assume)
 
 | Question | Verified? | Notes |

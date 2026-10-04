@@ -37,7 +37,7 @@ export CARBON_MAPPER_TOKEN=...
 python data/scripts/carbon_mapper_snapshot.py --plume tan20260813t190401c96s4001-B --out main
 ```
 
-Put `GROK_API_KEY`, `RELAY_API_KEY`, and `RELAY_API_BASE` in `services/core-api/.env` (see `.env.example`). Agent folders use their own `.env` for `CORE_API_BASE` / `CORE_API_BEARER` only.
+Put `GROK_API_KEY`, `RELAY_API_KEY`, and `RELAY_API_BASE` in the **repo-root** `.env` (see root `.env.example` on the backend branch). The Core API does not read `services/core-api/.env`. Agent folders use their own `.env` for `CORE_API_BASE` / `CORE_API_TOKEN` only.
 
 ## Backend
 

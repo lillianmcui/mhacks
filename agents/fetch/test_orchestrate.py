@@ -5,7 +5,13 @@ from __future__ import annotations
 import unittest
 from typing import Any
 
-from orchestrate import CoreApiError, handle_user_request, run_handle_sequence, summarize_open
+from orchestrate import (
+    CoreApiError,
+    format_handle_result,
+    handle_user_request,
+    run_handle_sequence,
+    summarize_open,
+)
 
 
 class FakeApi:
@@ -145,6 +151,41 @@ class OrchestrateTests(unittest.TestCase):
         api = FakeApi()
         reply = handle_user_request(api, "hello")
         self.assertIn("Ask:", reply)
+
+    def test_format_already_alerted_handle_result(self) -> None:
+        text = format_handle_result(
+            {
+                "incident": {"incident_id": "inc-1"},
+                "steps": [
+                    {
+                        "step": "notify_operator",
+                        "ok": True,
+                        "detail": "already alerted (alert ALR-1); awaiting acknowledgement, not sent again",
+                    }
+                ],
+                "briefing": {"text": "SMS stub", "source": "TEMPLATE"},
+                "alert": {"alert_id": "ALR-1", "delivery_status": "SENT"},
+            }
+        )
+        self.assertIn("already alerted", text)
+        self.assertIn("no second SMS", text)
+
+    def test_format_failed_delivery_step(self) -> None:
+        text = format_handle_result(
+            {
+                "incident": {"incident_id": "inc-1"},
+                "steps": [
+                    {
+                        "step": "notify_operator",
+                        "ok": False,
+                        "detail": "UPSTREAM_UNAVAILABLE: Relay unavailable",
+                    }
+                ],
+                "briefing": {"text": "SMS stub", "source": "TEMPLATE"},
+                "alert": None,
+            }
+        )
+        self.assertIn("[fail] notify_operator", text)
 
 
 if __name__ == "__main__":
