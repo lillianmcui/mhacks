@@ -31,6 +31,10 @@ export function Operator() {
   }, [incidentId, runBriefing]);
 
   const err = ack.error ?? investigate.error ?? briefing.error;
+  // The alert text is already in the subscribed rows, so it can be shown at
+  // once while the fuller briefing is being written.
+  const sentAlert = view?.latestAlert;
+  const shown = briefing.result ?? (sentAlert ? { text: sentAlert.message_text, source: sentAlert.briefing_source } : null);
   // The backend needs a contact to record the acknowledgement against.
   const contactId = view?.incident.assigned_contact_id ?? null;
 
@@ -62,14 +66,11 @@ export function Operator() {
             <section className="phone__briefing">
               <div className="card__briefing-head">
                 Briefing
-                {briefing.result && (
-                  <span className={`badge badge--${briefing.result.source.toLowerCase()}`}>{briefing.result.source}</span>
-                )}
+                {shown && <span className={`badge badge--${shown.source.toLowerCase()}`}>{shown.source}</span>}
               </div>
-              {briefing.result ? (
-                <BriefingText text={briefing.result.text} />
-              ) : (
-                briefing.pending && <p className="card__muted">Generating…</p>
+              {shown && <BriefingText text={shown.text} />}
+              {!briefing.result && briefing.pending && (
+                <p className="card__muted">{shown ? 'Alert as sent. Loading the full briefing…' : 'Generating…'}</p>
               )}
             </section>
 
