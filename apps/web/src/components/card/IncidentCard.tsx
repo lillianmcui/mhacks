@@ -12,6 +12,7 @@ import {
 } from '@ch4se/contracts';
 import type { IncidentView } from '../../data/selectors';
 import { Attribution } from '../Attribution';
+import { BriefingText } from '../BriefingText';
 import { StatusHeadline } from './StatusHeadline';
 
 /**
@@ -70,7 +71,7 @@ export function IncidentCard({ view, pendingEvent }: { view: IncidentView | null
               {latestAlert.briefing_source}
             </span>
           </div>
-          <p>{latestAlert.message_text}</p>
+          <BriefingText text={latestAlert.message_text} />
         </section>
       )}
 
