@@ -1,15 +1,19 @@
 import type {
   Actor,
-  ActionInputs,
+  ActionInput,
   ActionName,
-  ActionOutputs,
+  ActionOutput,
   AlertChannel,
-  Envelope,
+  ApiResponse,
+  Briefing,
+  ErrorCode,
+  HandleResult,
+  HandleStep,
   Incident,
   IncidentStatus,
   IncidentSummary,
 } from '@ch4se/contracts';
-import { PRIORITIES } from '@ch4se/contracts';
+import { HANDLE_STEPS, PRIORITIES, formatAssetMatch, formatEmission, formatProvenance, formatStatusHeadline } from '@ch4se/contracts';
 import type { DbStore } from '../store';
 import { MockSync } from './mockSync';
 import type { TableName, TableRows } from '../store';
@@ -38,7 +42,7 @@ const ALLOWED: Record<IncidentStatus, IncidentStatus[]> = {
 };
 
 class MockError extends Error {
-  constructor(public code: Extract<Envelope<never>, { ok: false }>['error']['code'], message: string) {
+  constructor(public code: ErrorCode, message: string) {
     super(message);
   }
 }
@@ -105,6 +109,7 @@ export class MockBackend {
           distance_m: MOCK_MATCH.distance_m,
           candidates: [MOCK_MATCH],
           priority: 'HIGH',
+          policy_id: 'POL-1',
           policy_rule_id: 'MOCK-RULE-HIGH-RECURRING',
           status: 'ANALYZED',
           assigned_contact_id: asset.site_manager_contact_id,
@@ -121,7 +126,7 @@ export class MockBackend {
   async simulateRelayAck(): Promise<void> {
     if (this.sync.role === 'follower') return this.sync.forwardCmd('simulateRelayAck');
     const inc = this.openIncidents()[0];
-    if (!inc) return;
+    if (!inc || inc.assigned_contact_id === null) return;
     await this.call('acknowledge_incident', {
       incident_id: inc.incident_id,
       contact_id: inc.assigned_contact_id,
@@ -130,14 +135,14 @@ export class MockBackend {
     });
   }
 
-  async call<N extends ActionName>(name: N, body: ActionInputs[N]): Promise<Envelope<ActionOutputs[N]>> {
+  async call<N extends ActionName>(name: N, body: ActionInput<N>): Promise<ApiResponse<ActionOutput<N>>> {
     if (this.sync.role === 'follower') {
-      return (await this.sync.forwardCall(name, body)) as Envelope<ActionOutputs[N]>;
+      return (await this.sync.forwardCall(name, body)) as ApiResponse<ActionOutput<N>>;
     }
     await sleep(LATENCY_MS);
     try {
       const data = await this.dispatch(name, body);
-      return { ok: true, data: data as ActionOutputs[N] };
+      return { ok: true, data: data as ActionOutput<N> };
     } catch (e) {
       if (e instanceof MockError) return { ok: false, error: { code: e.code, message: e.message } };
       throw e;
@@ -147,13 +152,13 @@ export class MockBackend {
   private async dispatch(name: ActionName, body: unknown): Promise<unknown> {
     switch (name) {
       case 'get_open_incidents':
-        return this.openIncidents().map(summary);
+        return this.openIncidents().map((i) => this.summary(i));
       case 'generate_briefing': {
-        const { incident_id } = body as ActionInputs['generate_briefing'];
-        return { text: this.briefing(this.get(incident_id)), source: 'TEMPLATE' };
+        const { incident_id } = body as ActionInput<'generate_briefing'>;
+        return this.briefing(this.get(incident_id));
       }
       case 'acknowledge_incident': {
-        const b = body as ActionInputs['acknowledge_incident'];
+        const b = body as ActionInput<'acknowledge_incident'>;
         const actor: Actor = b.channel === 'DASHBOARD' ? 'DASHBOARD' : 'RELAY_AGENT';
         this.transition(b.incident_id, 'ACKNOWLEDGED', actor);
         this.put('Acknowledgement', { incident_id: b.incident_id, contact_id: b.contact_id, channel: b.channel, at: now() });
@@ -161,28 +166,33 @@ export class MockBackend {
           await sleep(STEP_MS);
           this.transition(b.incident_id, b.then_status, actor);
         }
-        return summary(this.get(b.incident_id));
+        return this.summary(this.get(b.incident_id));
       }
       case 'set_incident_status': {
-        const b = body as ActionInputs['set_incident_status'];
+        const b = body as ActionInput<'set_incident_status'>;
         this.transition(b.incident_id, b.status, b.actor, b.note);
-        return summary(this.get(b.incident_id));
+        return this.summary(this.get(b.incident_id));
       }
       case 'handle_highest_priority': {
-        const { actor } = body as ActionInputs['handle_highest_priority'];
+        const { actor } = body as ActionInput<'handle_highest_priority'>;
         return this.handleHighest(actor);
       }
+      default:
+        throw new MockError('NOT_FOUND', `the mock backend does not implement ${name}`);
     }
   }
 
-  private async handleHighest(actor: Actor) {
+  private async handleHighest(actor: Actor): Promise<HandleResult> {
     const inc = this.openIncidents().find((i) => i.status === 'ANALYZED');
     if (!inc) throw new MockError('NO_OPEN_INCIDENTS', 'No open incidents awaiting action');
-    const steps = ['get_open_incidents', 'get_incident', 'get_asset', 'get_escalation_policy', 'generate_briefing'];
-    for (const step of steps) {
+    if (inc.assigned_contact_id === null) throw new MockError('VALIDATION_ERROR', 'incident has no assigned contact');
+    const steps: HandleStep[] = [];
+    for (const step of HANDLE_STEPS.filter((s) => s !== 'notify_operator')) {
+      steps.push({ step, ok: true, detail: '' });
       this.action(inc.incident_id, actor, step, '');
       await sleep(STEP_MS);
     }
+    const briefing = this.briefing(inc);
     const channel: AlertChannel = 'SMS';
     const alert_id = `ALT-${++this.seq}`;
     this.put('Alert', {
@@ -192,16 +202,62 @@ export class MockBackend {
       channel,
       sent_at: now(),
       delivery_status: 'SENT',
-      message_text: this.briefing(inc),
-      briefing_source: 'TEMPLATE',
+      message_text: briefing.text,
+      briefing_source: briefing.source,
     });
     this.action(inc.incident_id, actor, 'notify_operator', `${channel} to ${inc.assigned_contact_id}`);
     this.transition(inc.incident_id, 'ALERT_SENT', 'SYSTEM');
-    return { incident_id: inc.incident_id, alert_id, delivery_status: 'SENT', steps: [...steps, 'notify_operator'] };
+    steps.push({ step: 'notify_operator', ok: true, detail: `alert ${alert_id}: SENT` });
+    return {
+      incident: this.summary(this.get(inc.incident_id)),
+      steps,
+      briefing,
+      alert: { alert_id, delivery_status: 'SENT' },
+    };
   }
 
-  private briefing(inc: Incident): string {
-    return `[MOCK TEMPLATE] Replayed historical observation. ${inc.priority} priority methane plume; associated asset ${inc.asset_id ?? 'none'}. Rule ${inc.policy_rule_id}.`;
+  private briefing(inc: Incident): Briefing {
+    return {
+      text: `[MOCK TEMPLATE] Replayed historical observation. ${inc.priority} priority methane plume; associated asset ${inc.asset_id ?? 'none'}. Rule ${inc.policy_rule_id}.`,
+      source: 'TEMPLATE',
+    };
+  }
+
+  private summary(i: Incident): IncidentSummary {
+    const event = this.store.rows('MethaneEvent').find((e) => e.event_id === i.event_id);
+    if (!event) throw new MockError('NOT_FOUND', `event ${i.event_id} not found`);
+    const asset = this.store.rows('Asset').find((a) => a.asset_id === i.asset_id);
+    return {
+      incident_id: i.incident_id,
+      event_id: i.event_id,
+      status: i.status,
+      priority: i.priority,
+      policy_rule_id: i.policy_rule_id,
+      match_result: i.match_result,
+      asset_id: i.asset_id,
+      facility_type: asset?.facility_type ?? null,
+      distance_m: i.distance_m,
+      assigned_contact_id: i.assigned_contact_id,
+      emission_auto: event.emission_auto,
+      emission_uncertainty_auto: event.emission_uncertainty_auto,
+      scene_timestamp: event.scene_timestamp,
+      is_replay: event.is_replay,
+      created_at: i.created_at,
+      updated_at: i.updated_at,
+      display: {
+        headline: formatStatusHeadline(i.status, i.priority),
+        asset: formatAssetMatch({
+          match_result: i.match_result,
+          asset:
+            asset && i.distance_m !== null
+              ? { asset_id: asset.asset_id, facility_type: asset.facility_type, distance_m: i.distance_m }
+              : null,
+          candidate_count: i.candidates.length,
+        }),
+        emission: formatEmission(event.emission_auto, event.emission_uncertainty_auto),
+        provenance: formatProvenance(event),
+      },
+    };
   }
 
   private openIncidents(): Incident[] {
@@ -229,8 +285,4 @@ export class MockBackend {
   private action(incident_id: string, actor: Actor, action_name: string, detail: string): void {
     this.put('Action', { action_id: `ACT-${String(++this.seq).padStart(6, '0')}`, incident_id, actor, action_name, detail, at: now() });
   }
-}
-
-function summary(i: Incident): IncidentSummary {
-  return { incident_id: i.incident_id, status: i.status, priority: i.priority, asset_id: i.asset_id, updated_at: i.updated_at };
 }

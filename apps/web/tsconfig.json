@@ -13,12 +13,12 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@ch4se/contracts": ["src/contracts-shim/index.ts"],
-      "@ch4se/contracts/format": ["src/contracts-shim/format.ts"],
-      "@ch4se/stdb-bindings": ["src/contracts-shim/stdb-bindings.ts"]
+      "@ch4se/contracts": ["../../packages/contracts/src/index.ts"],
+      "@ch4se/stdb-bindings": ["../../packages/stdb-bindings/src/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

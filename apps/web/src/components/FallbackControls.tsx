@@ -10,6 +10,9 @@ import { useAction } from '../hooks/useAction';
  */
 export function FallbackControls({ incidentId }: { incidentId?: string }) {
   const handle = useAction('handle_highest_priority');
+  // The run can succeed while a step inside it fails (e.g. Relay is down).
+  const failedSteps = handle.result?.steps.filter((step) => !step.ok) ?? [];
+  const notify = handle.result?.steps.find((step) => step.step === 'notify_operator');
 
   return (
     <aside className="fallback">
@@ -22,6 +25,17 @@ export function FallbackControls({ incidentId }: { incidentId?: string }) {
       {handle.error && (
         <p className="fallback__error">
           {handle.error.code}: {handle.error.message}
+        </p>
+      )}
+      {!handle.error &&
+        failedSteps.map((step) => (
+          <p key={step.step} className="fallback__error">
+            {step.step} failed: {step.detail}
+          </p>
+        ))}
+      {!handle.error && failedSteps.length === 0 && notify && (
+        <p className="card__muted">
+          {handle.result!.incident.incident_id}: {notify.detail}
         </p>
       )}
       <Link

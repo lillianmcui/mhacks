@@ -1,15 +1,15 @@
 import type { ReactNode } from 'react';
 import type { MethaneEvent } from '@ch4se/contracts';
-import { MATCH_RADIUS_M } from '@ch4se/contracts';
 import {
+  formatAlertSent,
+  formatAssetMatch,
   formatDistance,
   formatEmission,
   formatHistory,
   formatPersistence,
   formatProvenance,
-  formatTimestamp,
   formatWind,
-} from '@ch4se/contracts/format';
+} from '@ch4se/contracts';
 import type { IncidentView } from '../../data/selectors';
 import { Attribution } from '../Attribution';
 import { StatusHeadline } from './StatusHeadline';
@@ -22,6 +22,8 @@ import { StatusHeadline } from './StatusHeadline';
 export function IncidentCard({ view, pendingEvent }: { view: IncidentView | null; pendingEvent?: MethaneEvent }) {
   if (!view) return <EmptyCard event={pendingEvent} />;
   const { incident, event, asset, contact, providerSource, latestAlert } = view;
+  const wind = event ? formatWind(event) : null;
+  const persistence = formatPersistence(providerSource?.persistence ?? null);
 
   return (
     <article className={`card card--${incident.match_result.toLowerCase()}`}>
@@ -29,8 +31,7 @@ export function IncidentCard({ view, pendingEvent }: { view: IncidentView | null
 
       {incident.status === 'ALERT_SENT' && latestAlert && (
         <p className="card__subline">
-          Alert sent to {contact?.name ?? latestAlert.contact_id} via {latestAlert.channel} at{' '}
-          {formatTimestamp(latestAlert.sent_at)}
+          {formatAlertSent(contact?.name ?? latestAlert.contact_id, latestAlert.channel, latestAlert.sent_at)}
         </p>
       )}
 
@@ -46,19 +47,11 @@ export function IncidentCard({ view, pendingEvent }: { view: IncidentView | null
 
       {event && (
         <section className="card__section">
-          <Row label="Provider">{formatProvenance(event.provider, event.instrument, event.scene_timestamp)}</Row>
+          <Row label="Provider">{formatProvenance(event)}</Row>
           <Row label="Emissions">{formatEmission(event.emission_auto, event.emission_uncertainty_auto)}</Row>
-          {event.wind_speed_avg_auto != null && event.wind_direction_avg_auto != null && (
-            <Row label="Wind">
-              {formatWind(event.wind_speed_avg_auto, event.wind_direction_avg_auto, event.wind_source_auto)}
-            </Row>
-          )}
-          {providerSource && (
-            <Row label="History">{formatHistory(providerSource.detection_dates, providerSource.observation_dates)}</Row>
-          )}
-          {providerSource?.persistence != null && (
-            <Row label="Persistence">{formatPersistence(providerSource.persistence)}</Row>
-          )}
+          {wind && <Row label="Wind">{wind}</Row>}
+          {providerSource && <Row label="History">{formatHistory(providerSource)}</Row>}
+          {persistence && <Row label="Persistence">{persistence}</Row>}
         </section>
       )}
 
@@ -88,40 +81,37 @@ export function IncidentCard({ view, pendingEvent }: { view: IncidentView | null
   );
 }
 
+/** The same sentence the briefings use: the matched asset, or the nearest candidate when ambiguous. */
+function assetLine({ incident, asset, candidates, nearestCandidate: nearest }: IncidentView): string {
+  const shown = incident.match_result === 'MATCHED' ? asset : nearest?.asset;
+  const distance_m = incident.match_result === 'MATCHED' ? incident.distance_m : (nearest?.distance_m ?? null);
+  return formatAssetMatch({
+    match_result: incident.match_result,
+    asset:
+      shown && distance_m !== null
+        ? { asset_id: shown.asset_id, facility_type: shown.facility_type, distance_m }
+        : null,
+    candidate_count: candidates.length,
+  });
+}
+
 function MatchLine({ view }: { view: IncidentView }) {
-  const { incident, asset, contact } = view;
-  switch (incident.match_result) {
-    case 'MATCHED':
-      return (
-        <p className="card__asset">
-          Associated asset: <strong>{incident.asset_id}</strong> {asset?.facility_type}
-          {incident.distance_m != null && <> ({formatDistance(incident.distance_m)} from plume origin)</>}
-        </p>
-      );
-    case 'AMBIGUOUS':
-      return (
-        <div>
-          <p className="card__asset">
-            Ambiguous: {view.candidates.length} registered assets within {formatDistance(MATCH_RADIUS_M)} of plume origin
-          </p>
-          <ul className="card__candidates">
-            {view.candidates.map((c) => (
-              <li key={c.asset_id}>
-                <strong>{c.asset_id}</strong> {c.asset?.facility_type} · {formatDistance(c.distance_m)}
-              </li>
-            ))}
-          </ul>
-          {contact && <p className="card__muted">Routed to: {contact.role}</p>}
-        </div>
-      );
-    case 'NO_REGISTERED_ASSET':
-      return (
-        <div>
-          <p className="card__asset">No registered asset within {formatDistance(MATCH_RADIUS_M)} of plume origin</p>
-          {contact && <p className="card__muted">Routed to: {contact.role}</p>}
-        </div>
-      );
-  }
+  const { incident, contact } = view;
+  return (
+    <div>
+      <p className="card__asset">{assetLine(view)}</p>
+      {incident.match_result === 'AMBIGUOUS' && (
+        <ul className="card__candidates">
+          {view.candidates.map((c) => (
+            <li key={c.asset_id}>
+              <strong>{c.asset_id}</strong> {c.asset?.facility_type} · {formatDistance(c.distance_m)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {incident.match_result !== 'MATCHED' && contact && <p className="card__muted">Routed to: {contact.role}</p>}
+    </div>
+  );
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -138,7 +128,7 @@ function EmptyCard({ event }: { event?: MethaneEvent }) {
     <article className="card card--empty">
       <h2 className="headline headline--waiting">{event ? 'Analyzing replayed observation…' : 'Waiting for replay…'}</h2>
       {event && (
-        <p className="card__muted">{formatProvenance(event.provider, event.instrument, event.scene_timestamp)}</p>
+        <p className="card__muted">{formatProvenance(event)}</p>
       )}
       <footer className="card__footer">
         <Attribution />

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { MATCH_RADIUS_M } from '@ch4se/contracts';
+import { DEFAULT_MATCH_RADIUS_M } from '@ch4se/contracts';
 import { ConnectionIndicator } from '../components/ConnectionIndicator';
 import { FallbackControls } from '../components/FallbackControls';
 import { IncidentCard } from '../components/card/IncidentCard';
@@ -42,7 +42,7 @@ export function Dashboard() {
             focusEvent={focusEvent}
             highlightAssetId={view?.incident.asset_id}
             candidateAssetIds={candidateIds}
-            radiusM={MATCH_RADIUS_M}
+            radiusM={DEFAULT_MATCH_RADIUS_M}
           />
           {fallback && <FallbackControls incidentId={view?.incident.incident_id} />}
         </div>

@@ -17,6 +17,8 @@ export interface IncidentView {
   asset: Asset | undefined;
   contact: Contact | undefined;
   candidates: { asset: Asset | undefined; asset_id: string; distance_m: number }[];
+  /** Candidates arrive nearest first; this is the one shown when the match is ambiguous. */
+  nearestCandidate: { asset: Asset | undefined; asset_id: string; distance_m: number } | undefined;
   alerts: Alert[];
   latestAlert: Alert | undefined;
   acknowledgements: Acknowledgement[];
@@ -45,13 +47,15 @@ export function selectIncidentView(snap: DbSnapshot, incidentId?: string | null)
   const alerts = t.Alert.filter((a) => a.incident_id === incident.incident_id).sort((a, b) =>
     newestFirst(a.sent_at, b.sent_at),
   );
+  const candidates = incident.candidates.map((c) => ({ ...c, asset: t.Asset.find((a) => a.asset_id === c.asset_id) }));
   return {
     incident,
     event,
     providerSource: event && t.ProviderSource.find((p) => p.source_name === event.source_name),
     asset: incident.asset_id ? t.Asset.find((a) => a.asset_id === incident.asset_id) : undefined,
     contact: t.Contact.find((c) => c.contact_id === incident.assigned_contact_id),
-    candidates: incident.candidates.map((c) => ({ ...c, asset: t.Asset.find((a) => a.asset_id === c.asset_id) })),
+    candidates,
+    nearestCandidate: candidates[0],
     alerts,
     latestAlert: alerts[0],
     acknowledgements: t.Acknowledgement.filter((a) => a.incident_id === incident.incident_id),
